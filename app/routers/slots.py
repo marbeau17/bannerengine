@@ -80,14 +80,24 @@ async def update_slot(request: Request, pattern_id: str, slot_id: str):
 
     # Parse form data sent by htmx
     form_data = await request.form()
-    value = form_data.get("value", "")
+    value = form_data.get("content", form_data.get("value", ""))
 
     # Validate
     validation_errors = _validate_slot_value(slot, str(value))
 
     # Persist to session regardless (so the user doesn't lose input)
     session_slots = _get_session_slots(request, pattern_id)
-    session_slots[slot_id] = {"value": str(value)}
+    slot_type = form_data.get("slot_type", "text")
+    if slot_type == "button":
+        session_slots[slot_id] = {
+            "label": str(value),
+            "bg_color": form_data.get("bg_color", slot.bg_color or "#333333"),
+            "text_color": form_data.get("text_color", slot.text_color or "#ffffff"),
+        }
+    elif slot_type == "image":
+        session_slots[slot_id] = str(value)
+    else:
+        session_slots[slot_id] = str(value)
     _set_session_slots(request, pattern_id, session_slots)
 
     # Re-render SVG preview with current slot values

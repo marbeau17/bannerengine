@@ -3,8 +3,8 @@
   class="inline-block shadow-lg bg-white transition-transform duration-150"
   style="max-width: 100%; max-height: 100%;"
 >
-  {% if svg_content %}
-    {{ svg_content | safe }}
+  {% if svg_content or svg_markup %}
+    {{ (svg_content or svg_markup) | safe }}
   {% elif template %}
     <!-- Placeholder canvas matching template dimensions -->
     <svg

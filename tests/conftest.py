@@ -63,7 +63,7 @@ def xml_parser() -> XMLTemplateParser:
 @pytest.fixture
 def parsed_car_template(xml_parser: XMLTemplateParser, sample_car_xml_path: str) -> BannerTemplate:
     """A fully parsed BannerTemplate from the sample car fixture."""
-    return xml_parser.parse_file(sample_car_xml_path)
+    return xml_parser.parse_file(sample_car_xml_path)[0]
 
 
 @pytest.fixture
