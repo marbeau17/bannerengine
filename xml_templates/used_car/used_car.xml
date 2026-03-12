@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<banner_templates category="used_car">
+
+  <!-- ======================================================================
+       used_car_01: 単品車両訴求型 (380x380)
+       車両写真をフル背景に、価格・走行距離を下部に配置
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>used_car</category>
+      <pattern_id>used_car_01</pattern_id>
+      <pattern_name>単品車両訴求型</pattern_name>
+      <width>380</width>
+      <height>380</height>
+      <unit>px</unit>
+      <aspect_ratio>1:1</aspect_ratio>
+      <layout_type>full_background</layout_type>
+      <recommended_use>SNS広告・在庫一覧サムネイル</recommended_use>
+    </meta>
+    <design>
+      <background_type>image</background_type>
+      <background_value>#FFFFFF</background_value>
+      <overlay_type>gradient</overlay_type>
+      <overlay_opacity>0.4</overlay_opacity>
+      <primary_color>#1A1A1A</primary_color>
+      <accent_color>#E60012</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>bottom_dark</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>car_photo</id>
+        <type>image</type>
+        <x>0</x>
+        <y>0</y>
+        <width>100</width>
+        <height>65</height>
+        <description>車両正面・斜め前方写真</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 760x494px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>car_name</id>
+        <type>text</type>
+        <x>3</x>
+        <y>67</y>
+        <width>60</width>
+        <height>8</height>
+        <description>車種名（例：トヨタ プリウス 2022年式）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#000000</color>
+      </slot>
+      <slot>
+        <id>price</id>
+        <type>text</type>
+        <x>3</x>
+        <y>76</y>
+        <width>50</width>
+        <height>12</height>
+        <description>販売価格（例：198万円）</description>
+        <required>true</required>
+        <max_chars>12</max_chars>
+        <font_size_guideline>28px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#E60012</color>
+      </slot>
+      <slot>
+        <id>mileage</id>
+        <type>text</type>
+        <x>55</x>
+        <y>76</y>
+        <width>42</width>
+        <height>6</height>
+        <description>走行距離（例：3.2万km）</description>
+        <required>false</required>
+        <max_chars>12</max_chars>
+        <font_size_guideline>12px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>inspection</id>
+        <type>text</type>
+        <x>55</x>
+        <y>82</y>
+        <width>42</width>
+        <height>6</height>
+        <description>車検期限（例：2027年3月）</description>
+        <required>false</required>
+        <max_chars>12</max_chars>
+        <font_size_guideline>12px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>0</x>
+        <y>88</y>
+        <width>100</width>
+        <height>12</height>
+        <description>詳細ページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>詳細を見る</default_label>
+        <bg_color>#E60012</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>car_photo スロットは必須入力です。車両の正面または斜め前方からの写真を推奨します。</rule>
+      <rule>car_name は最大20文字です。車種名・年式を含めてください。</rule>
+      <rule>price は最大12文字です。「万円」表記を推奨します。</rule>
+      <rule>画像は最低760x494px以上の解像度を推奨します。</rule>
+      <rule>price テキストのコントラスト比は背景に対して4.5:1以上を確保してください。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       used_car_02: 複数在庫グリッド型 (600x254)
+       3〜4台のサムネイルと価格一覧
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>used_car</category>
+      <pattern_id>used_car_02</pattern_id>
+      <pattern_name>複数在庫グリッド型</pattern_name>
+      <width>600</width>
+      <height>254</height>
+      <unit>px</unit>
+      <aspect_ratio>300:127</aspect_ratio>
+      <layout_type>grid</layout_type>
+      <recommended_use>ウェブバナー・メルマガヘッダー</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#F5F5F5</background_value>
+      <primary_color>#1A1A1A</primary_color>
+      <accent_color>#E60012</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>card_grid</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>header_copy</id>
+        <type>text</type>
+        <x>2</x>
+        <y>2</y>
+        <width>96</width>
+        <height>14</height>
+        <description>ヘッダーコピー（例：今週のおすすめ在庫）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>18px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#1A1A1A</color>
+      </slot>
+      <slot>
+        <id>car_image_1</id>
+        <type>image</type>
+        <x>2</x>
+        <y>18</y>
+        <width>23</width>
+        <height>50</height>
+        <description>車両写真1</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG</format_hint>
+      </slot>
+      <slot>
+        <id>car_image_2</id>
+        <type>image</type>
+        <x>27</x>
+        <y>18</y>
+        <width>23</width>
+        <height>50</height>
+        <description>車両写真2</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG</format_hint>
+      </slot>
+      <slot>
+        <id>car_image_3</id>
+        <type>image</type>
+        <x>52</x>
+        <y>18</y>
+        <width>23</width>
+        <height>50</height>
+        <description>車両写真3</description>
+        <required>false</required>
+        <format_hint>JPEG or PNG</format_hint>
+      </slot>
+      <slot>
+        <id>car_image_4</id>
+        <type>image</type>
+        <x>77</x>
+        <y>18</y>
+        <width>21</width>
+        <height>50</height>
+        <description>車両写真4</description>
+        <required>false</required>
+        <format_hint>JPEG or PNG</format_hint>
+      </slot>
+      <slot>
+        <id>price_label</id>
+        <type>text</type>
+        <x>2</x>
+        <y>70</y>
+        <width>96</width>
+        <height>10</height>
+        <description>価格帯テキスト（例：89万円〜298万円）</description>
+        <required>true</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>14px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#E60012</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>60</x>
+        <y>82</y>
+        <width>38</width>
+        <height>16</height>
+        <description>在庫一覧ページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>在庫一覧を見る</default_label>
+        <bg_color>#E60012</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>car_image_1 および car_image_2 は必須入力です。</rule>
+      <rule>header_copy は最大20文字です。</rule>
+      <rule>price_label は最大25文字です。価格帯を記載してください。</rule>
+      <rule>車両写真はアスペクト比 4:3 を推奨します。</rule>
+      <rule>グリッド内の画像サイズは統一してください。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       used_car_03: フェア告知型 (996x998)
+       イベント情報と目玉車両を大きく配置
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>used_car</category>
+      <pattern_id>used_car_03</pattern_id>
+      <pattern_name>フェア告知型</pattern_name>
+      <width>996</width>
+      <height>998</height>
+      <unit>px</unit>
+      <aspect_ratio>498:499</aspect_ratio>
+      <layout_type>copy_focused</layout_type>
+      <recommended_use>Instagram投稿・店頭ディスプレイ</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#FFFFFF</background_value>
+      <overlay_type>solid</overlay_type>
+      <overlay_opacity>0.05</overlay_opacity>
+      <primary_color>#1A1A1A</primary_color>
+      <accent_color>#E60012</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>top_accent_bar</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>event_badge</id>
+        <type>text</type>
+        <x>5</x>
+        <y>3</y>
+        <width>90</width>
+        <height>8</height>
+        <description>イベントバッジ（例：決算セール開催中！）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>24px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#FFFFFF</color>
+      </slot>
+      <slot>
+        <id>main_copy</id>
+        <type>text</type>
+        <x>5</x>
+        <y>13</y>
+        <width>90</width>
+        <height>12</height>
+        <description>メインキャッチコピー（例：最大50万円値引き）</description>
+        <required>true</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>36px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#E60012</color>
+      </slot>
+      <slot>
+        <id>featured_car_photo</id>
+        <type>image</type>
+        <x>5</x>
+        <y>27</y>
+        <width>90</width>
+        <height>40</height>
+        <description>目玉車両の写真</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 1800x800px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>featured_car_name</id>
+        <type>text</type>
+        <x>5</x>
+        <y>69</y>
+        <width>55</width>
+        <height>6</height>
+        <description>目玉車両名（例：メルセデス・ベンツ Cクラス）</description>
+        <required>true</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>20px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#1A1A1A</color>
+      </slot>
+      <slot>
+        <id>featured_price</id>
+        <type>text</type>
+        <x>62</x>
+        <y>69</y>
+        <width>33</width>
+        <height>6</height>
+        <description>目玉車両の特別価格（例：特別価格 248万円）</description>
+        <required>true</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>22px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#E60012</color>
+      </slot>
+      <slot>
+        <id>event_period</id>
+        <type>text</type>
+        <x>5</x>
+        <y>77</y>
+        <width>60</width>
+        <height>5</height>
+        <description>開催期間（例：3/1(土)〜3/31(月)）</description>
+        <required>false</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>14px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>sub_copy</id>
+        <type>text</type>
+        <x>5</x>
+        <y>83</y>
+        <width>90</width>
+        <height>5</height>
+        <description>補足テキスト（例：全車保証付き・下取り強化中）</description>
+        <required>false</required>
+        <max_chars>30</max_chars>
+        <font_size_guideline>13px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>20</x>
+        <y>89</y>
+        <width>60</width>
+        <height>9</height>
+        <description>フェア詳細ページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>フェア詳細を見る</default_label>
+        <bg_color>#E60012</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>event_badge は必須入力です。20文字以内で簡潔に記載してください。</rule>
+      <rule>main_copy は最大25文字です。訴求力のあるコピーを記載してください。</rule>
+      <rule>featured_car_photo は必須入力です。高解像度画像を推奨します。</rule>
+      <rule>featured_price のテキスト色は背景に対してWCAG AA基準を満たしてください。</rule>
+      <rule>event_period を入力する場合は開始日と終了日を含めてください。</rule>
+      <rule>cta_button のラベルは行動喚起を明確にしてください。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       used_car_04: ブランドメッセージ型 (1200x630)
+       ブランドイメージ訴求、企業メッセージ中心
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>used_car</category>
+      <pattern_id>used_car_04</pattern_id>
+      <pattern_name>ブランドメッセージ型</pattern_name>
+      <width>1200</width>
+      <height>630</height>
+      <unit>px</unit>
+      <aspect_ratio>40:21</aspect_ratio>
+      <layout_type>brand_message</layout_type>
+      <recommended_use>OGP画像・Facebook広告</recommended_use>
+    </meta>
+    <design>
+      <background_type>image</background_type>
+      <background_value>#1A1A2E</background_value>
+      <overlay_type>gradient</overlay_type>
+      <overlay_opacity>0.55</overlay_opacity>
+      <primary_color>#FFFFFF</primary_color>
+      <accent_color>#FFD700</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>center_overlay</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>bg_image</id>
+        <type>image</type>
+        <x>0</x>
+        <y>0</y>
+        <width>100</width>
+        <height>100</height>
+        <description>背景画像（店舗外観・ショールーム写真）</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 2400x1260px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>brand_logo</id>
+        <type>image</type>
+        <x>5</x>
+        <y>5</y>
+        <width>20</width>
+        <height>12</height>
+        <description>販売店ロゴ</description>
+        <required>false</required>
+        <format_hint>PNG with transparency recommended</format_hint>
+      </slot>
+      <slot>
+        <id>main_copy</id>
+        <type>text</type>
+        <x>10</x>
+        <y>30</y>
+        <width>80</width>
+        <height>18</height>
+        <description>ブランドメッセージ（例：あなたの理想の一台、ここにあります。）</description>
+        <required>true</required>
+        <max_chars>30</max_chars>
+        <font_size_guideline>42px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#FFFFFF</color>
+      </slot>
+      <slot>
+        <id>sub_copy</id>
+        <type>text</type>
+        <x>15</x>
+        <y>52</y>
+        <width>70</width>
+        <height>10</height>
+        <description>サブコピー（例：厳選された中古車を安心の保証付きで）</description>
+        <required>false</required>
+        <max_chars>35</max_chars>
+        <font_size_guideline>18px</font_size_guideline>
+        <color>#E0E0E0</color>
+      </slot>
+      <slot>
+        <id>highlight_text</id>
+        <type>text</type>
+        <x>25</x>
+        <y>65</y>
+        <width>50</width>
+        <height>8</height>
+        <description>ハイライトテキスト（例：全車1年保証・全国納車対応）</description>
+        <required>false</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#FFD700</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>30</x>
+        <y>78</y>
+        <width>40</width>
+        <height>12</height>
+        <description>メインCTAボタン</description>
+        <required>true</required>
+        <default_label>在庫を探す</default_label>
+        <bg_color>#FFD700</bg_color>
+        <text_color>#1A1A1A</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>bg_image は必須入力です。店舗やショールームの写真を推奨します。</rule>
+      <rule>main_copy は最大30文字です。ブランドの価値を伝えるコピーを記載してください。</rule>
+      <rule>テキストはオーバーレイ上に配置されるため、白系テキストを推奨します。</rule>
+      <rule>brand_logo を使用する場合は透過PNGを推奨します。</rule>
+      <rule>cta_button のコントラスト比は WCAG AA 基準（4.5:1以上）を確保してください。</rule>
+    </rules>
+  </banner_template>
+
+</banner_templates>

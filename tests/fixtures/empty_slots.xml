@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template>
+  <meta>
+    <category>test</category>
+    <pattern_id>empty_slots_01</pattern_id>
+    <pattern_name>Empty Slots Template</pattern_name>
+    <width>800</width>
+    <height>600</height>
+    <unit>px</unit>
+    <aspect_ratio>4:3</aspect_ratio>
+    <layout_type>blank</layout_type>
+    <recommended_use>Testing template with no slots</recommended_use>
+  </meta>
+  <design>
+    <background_type>solid</background_type>
+    <background_value>#ffffff</background_value>
+    <primary_color>#000000</primary_color>
+    <font_style>default</font_style>
+  </design>
+  <slots>
+  </slots>
+  <rules>
+  </rules>
+</template>

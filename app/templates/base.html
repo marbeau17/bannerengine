@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banner Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/js/htmx.min.js"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="min-h-screen flex flex-col bg-gray-50 text-gray-800">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="text-xl font-bold text-indigo-600 tracking-tight">Banner Engine</a>
+      <nav class="flex items-center gap-6 text-sm font-medium text-gray-600">
+        <a href="/" class="hover:text-indigo-600 transition-colors">テンプレート一覧</a>
+        <a href="#" class="hover:text-indigo-600 transition-colors">使い方</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main class="flex-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-400">
+    <p>&copy; 2026 Banner Engine. All rights reserved.</p>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

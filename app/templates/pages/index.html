@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-screen-2xl mx-auto px-4 py-6 flex gap-6">
+
+  <!-- Left sidebar: category filter -->
+  <aside class="w-64 flex-shrink-0">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sticky top-4">
+      <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">カテゴリ</h2>
+      <div id="category-list">
+        {% include "partials/category_list.html" %}
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main area -->
+  <div class="flex-1 min-w-0">
+    <!-- Search bar -->
+    <div class="mb-6">
+      <div class="relative">
+        <input
+          type="search"
+          name="q"
+          placeholder="テンプレートを検索..."
+          class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+          hx-get="/api/templates"
+          hx-trigger="input changed delay:300ms"
+          hx-target="#template-grid"
+          hx-include="this"
+        >
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Template grid -->
+    <div id="template-grid">
+      {% include "partials/template_grid.html" %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

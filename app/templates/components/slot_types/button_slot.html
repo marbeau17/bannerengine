@@ -1,0 +1,56 @@
+<div class="space-y-2">
+  <!-- Label input -->
+  <div>
+    <label class="block text-[11px] font-medium text-gray-500 mb-1">ラベル</label>
+    <input
+      type="text"
+      name="content"
+      value="{{ current_value.get('content', current_slot.default_label or '') }}"
+      placeholder="ボタンラベル..."
+      class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+      hx-patch="/api/templates/{{ pattern_id }}/slots/{{ current_slot.id }}"
+      hx-target="#preview-canvas"
+      hx-trigger="input changed delay:300ms"
+      hx-vals='{"slot_type": "button"}'
+    >
+  </div>
+
+  <!-- Color pickers row -->
+  <div class="flex gap-3">
+    <!-- Background color -->
+    <div class="flex-1">
+      <label class="block text-[11px] font-medium text-gray-500 mb-1">背景色</label>
+      <div class="flex items-center gap-2">
+        <input
+          type="color"
+          name="bg_color"
+          value="{{ current_value.get('bg_color', current_slot.bg_color or '#000000') }}"
+          class="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
+          hx-patch="/api/templates/{{ pattern_id }}/slots/{{ current_slot.id }}"
+          hx-target="#preview-canvas"
+          hx-trigger="input changed delay:300ms"
+          hx-vals='{"slot_type": "button"}'
+        >
+        <span class="text-[11px] text-gray-400">{{ current_value.get('bg_color', current_slot.bg_color or '#000000') }}</span>
+      </div>
+    </div>
+
+    <!-- Text color -->
+    <div class="flex-1">
+      <label class="block text-[11px] font-medium text-gray-500 mb-1">文字色</label>
+      <div class="flex items-center gap-2">
+        <input
+          type="color"
+          name="text_color"
+          value="{{ current_value.get('text_color', current_slot.text_color or '#FFFFFF') }}"
+          class="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
+          hx-patch="/api/templates/{{ pattern_id }}/slots/{{ current_slot.id }}"
+          hx-target="#preview-canvas"
+          hx-trigger="input changed delay:300ms"
+          hx-vals='{"slot_type": "button"}'
+        >
+        <span class="text-[11px] text-gray-400">{{ current_value.get('text_color', current_slot.text_color or '#FFFFFF') }}</span>
+      </div>
+    </div>
+  </div>
+</div>

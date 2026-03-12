@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<banner_templates category="animal_funding">
+
+  <!-- ======================================================================
+       animal_funding_01: 支援呼びかけ型 (1200x630)
+       動物写真＋感情的コピー＋支援ボタンで寄付を訴求
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>animal_funding</category>
+      <pattern_id>animal_funding_01</pattern_id>
+      <pattern_name>支援呼びかけ型</pattern_name>
+      <width>1200</width>
+      <height>630</height>
+      <unit>px</unit>
+      <aspect_ratio>40:21</aspect_ratio>
+      <layout_type>full_background</layout_type>
+      <recommended_use>OGP画像・SNSシェア用・支援募集ページ</recommended_use>
+    </meta>
+    <design>
+      <background_type>image</background_type>
+      <background_value>#F5F0EB</background_value>
+      <overlay_type>gradient</overlay_type>
+      <overlay_opacity>0.3</overlay_opacity>
+      <primary_color>#333333</primary_color>
+      <accent_color>#E67E22</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>emotional_overlay</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>animal_photo</id>
+        <type>image</type>
+        <x>0</x>
+        <y>0</y>
+        <width>100</width>
+        <height>55</height>
+        <description>保護動物の写真（感情に訴える構図）</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 2400x693px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>main_copy</id>
+        <type>text</type>
+        <x>5</x>
+        <y>57</y>
+        <width>90</width>
+        <height>15</height>
+        <description>感情に訴えるキャッチコピー（例：この子に、あたたかい家を。）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>32px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#333333</color>
+      </slot>
+      <slot>
+        <id>sub_copy</id>
+        <type>text</type>
+        <x>5</x>
+        <y>72</y>
+        <width>90</width>
+        <height>8</height>
+        <description>活動説明文（例：年間500匹以上の命を救う活動を続けています）</description>
+        <required>false</required>
+        <max_chars>40</max_chars>
+        <font_size_guideline>14px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>goal_amount</id>
+        <type>text</type>
+        <x>5</x>
+        <y>81</y>
+        <width>45</width>
+        <height>7</height>
+        <description>目標金額（例：目標: 500万円）</description>
+        <required>true</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#E67E22</color>
+      </slot>
+      <slot>
+        <id>progress</id>
+        <type>text</type>
+        <x>52</x>
+        <y>81</y>
+        <width>43</width>
+        <height>7</height>
+        <description>達成率（例：72%達成）</description>
+        <required>false</required>
+        <max_chars>10</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#27AE60</color>
+      </slot>
+      <slot>
+        <id>support_button</id>
+        <type>button</type>
+        <x>10</x>
+        <y>89</y>
+        <width>80</width>
+        <height>10</height>
+        <description>支援ページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>この活動を支援する</default_label>
+        <bg_color>#E67E22</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>animal_photo は必須入力です。動物の表情が見える温かみのある写真を推奨します。</rule>
+      <rule>main_copy は最大20文字です。感情に訴えるコピーを記載してください。</rule>
+      <rule>goal_amount は必須入力です。目標金額を明確に記載してください。</rule>
+      <rule>support_button は目立つ配色で行動喚起を促してください。</rule>
+      <rule>画像は動物の目線がカメラに向いている構図が最も効果的です。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       animal_funding_02: 達成率表示型 (996x998)
+       プログレスバー＋目標金額＋動物写真で進捗を可視化
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>animal_funding</category>
+      <pattern_id>animal_funding_02</pattern_id>
+      <pattern_name>達成率表示型</pattern_name>
+      <width>996</width>
+      <height>998</height>
+      <unit>px</unit>
+      <aspect_ratio>498:499</aspect_ratio>
+      <layout_type>copy_focused</layout_type>
+      <recommended_use>Instagram投稿・クラウドファンディングページ</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#FFFFFF</background_value>
+      <primary_color>#333333</primary_color>
+      <accent_color>#27AE60</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>progress_card</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>project_title</id>
+        <type>text</type>
+        <x>5</x>
+        <y>3</y>
+        <width>90</width>
+        <height>8</height>
+        <description>プロジェクトタイトル（例：保護猫シェルター建設プロジェクト）</description>
+        <required>true</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>24px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#333333</color>
+      </slot>
+      <slot>
+        <id>animal_photo</id>
+        <type>image</type>
+        <x>5</x>
+        <y>13</y>
+        <width>90</width>
+        <height>38</height>
+        <description>保護動物または活動の写真</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 1792x758px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>current_amount</id>
+        <type>text</type>
+        <x>5</x>
+        <y>53</y>
+        <width>55</width>
+        <height>10</height>
+        <description>現在の支援額（例：¥3,650,000）</description>
+        <required>true</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>32px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#27AE60</color>
+      </slot>
+      <slot>
+        <id>goal_amount</id>
+        <type>text</type>
+        <x>62</x>
+        <y>53</y>
+        <width>33</width>
+        <height>10</height>
+        <description>目標金額（例：目標 ¥5,000,000）</description>
+        <required>true</required>
+        <max_chars>18</max_chars>
+        <font_size_guideline>18px</font_size_guideline>
+        <color>#999999</color>
+      </slot>
+      <slot>
+        <id>progress_rate</id>
+        <type>text</type>
+        <x>5</x>
+        <y>64</y>
+        <width>90</width>
+        <height>7</height>
+        <description>達成率テキスト（例：73% 達成 - あと135万円）</description>
+        <required>true</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>18px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#27AE60</color>
+      </slot>
+      <slot>
+        <id>supporter_count</id>
+        <type>text</type>
+        <x>5</x>
+        <y>72</y>
+        <width>45</width>
+        <height>5</height>
+        <description>支援者数（例：支援者 1,234人）</description>
+        <required>false</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>14px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>remaining_days</id>
+        <type>text</type>
+        <x>52</x>
+        <y>72</y>
+        <width>43</width>
+        <height>5</height>
+        <description>残り日数（例：残り 23日）</description>
+        <required>false</required>
+        <max_chars>10</max_chars>
+        <font_size_guideline>14px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#E67E22</color>
+      </slot>
+      <slot>
+        <id>description</id>
+        <type>text</type>
+        <x>5</x>
+        <y>78</y>
+        <width>90</width>
+        <height>8</height>
+        <description>プロジェクト説明（例：殺処分ゼロを目指して、安全な住まいを提供します）</description>
+        <required>false</required>
+        <max_chars>40</max_chars>
+        <font_size_guideline>14px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>support_button</id>
+        <type>button</type>
+        <x>15</x>
+        <y>88</y>
+        <width>70</width>
+        <height>10</height>
+        <description>支援ページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>このプロジェクトを支援する</default_label>
+        <bg_color>#27AE60</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>project_title は必須入力です。プロジェクトの内容が伝わる25文字以内のタイトルにしてください。</rule>
+      <rule>animal_photo は必須入力です。活動内容が伝わる写真を推奨します。</rule>
+      <rule>current_amount と goal_amount は必須入力です。金額はカンマ区切りで記載してください。</rule>
+      <rule>progress_rate は必須入力です。達成率を明確に表示してください。</rule>
+      <rule>remaining_days を入力すると緊急感を演出できます。</rule>
+      <rule>support_button は必ず目立つ位置・配色で配置してください。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       animal_funding_03: 里親募集型 (380x380)
+       動物プロフィール＋性格・年齢情報で里親募集
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>animal_funding</category>
+      <pattern_id>animal_funding_03</pattern_id>
+      <pattern_name>里親募集型</pattern_name>
+      <width>380</width>
+      <height>380</height>
+      <unit>px</unit>
+      <aspect_ratio>1:1</aspect_ratio>
+      <layout_type>full_background</layout_type>
+      <recommended_use>SNS投稿・里親募集サイト</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#FFF3E0</background_value>
+      <primary_color>#4E342E</primary_color>
+      <accent_color>#FF7043</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>profile_card</highlight_panel>
+      <illustration_style>paw_print</illustration_style>
+    </design>
+    <slots>
+      <slot>
+        <id>animal_photo</id>
+        <type>image</type>
+        <x>10</x>
+        <y>3</y>
+        <width>80</width>
+        <height>48</height>
+        <description>里親募集中の動物の写真（正面から、愛らしい表情）</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 608x365px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>recruit_badge</id>
+        <type>text</type>
+        <x>25</x>
+        <y>52</y>
+        <width>50</width>
+        <height>7</height>
+        <description>募集バッジ（例：里親さん募集中）</description>
+        <required>true</required>
+        <max_chars>12</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#FF7043</color>
+      </slot>
+      <slot>
+        <id>animal_name</id>
+        <type>text</type>
+        <x>5</x>
+        <y>60</y>
+        <width>90</width>
+        <height>8</height>
+        <description>動物の名前（例：ミケちゃん（メス・2歳）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>18px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#4E342E</color>
+      </slot>
+      <slot>
+        <id>personality</id>
+        <type>text</type>
+        <x>5</x>
+        <y>69</y>
+        <width>90</width>
+        <height>10</height>
+        <description>性格・特徴（例：甘えん坊で人懐っこい性格です）</description>
+        <required>true</required>
+        <max_chars>30</max_chars>
+        <font_size_guideline>13px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>location</id>
+        <type>text</type>
+        <x>5</x>
+        <y>80</y>
+        <width>50</width>
+        <height>6</height>
+        <description>保護場所（例：東京都世田谷区）</description>
+        <required>false</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>11px</font_size_guideline>
+        <color>#999999</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>5</x>
+        <y>87</y>
+        <width>90</width>
+        <height>11</height>
+        <description>詳細・お問い合わせボタン</description>
+        <required>true</required>
+        <default_label>この子の詳細を見る</default_label>
+        <bg_color>#FF7043</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>animal_photo は必須入力です。動物の顔がはっきり見える写真を推奨します。</rule>
+      <rule>recruit_badge は必須入力です。「里親募集中」などの短いテキストを記載してください。</rule>
+      <rule>animal_name は最大20文字です。名前・性別・年齢を含めてください。</rule>
+      <rule>personality は最大30文字です。性格や特徴を簡潔に記載してください。</rule>
+      <rule>cta_button は行動喚起を明確にしてください。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       animal_funding_04: 活動報告型 (600x254)
+       活動写真＋実績数字＋支援リンクで活動を報告
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>animal_funding</category>
+      <pattern_id>animal_funding_04</pattern_id>
+      <pattern_name>活動報告型</pattern_name>
+      <width>600</width>
+      <height>254</height>
+      <unit>px</unit>
+      <aspect_ratio>300:127</aspect_ratio>
+      <layout_type>grid</layout_type>
+      <recommended_use>ウェブバナー・メルマガ・活動報告ページ</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#FFFFFF</background_value>
+      <primary_color>#333333</primary_color>
+      <accent_color>#2196F3</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>report_layout</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>activity_photo</id>
+        <type>image</type>
+        <x>0</x>
+        <y>0</y>
+        <width>45</width>
+        <height>100</height>
+        <description>活動写真（保護活動・イベントの様子）</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 540x508px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>report_title</id>
+        <type>text</type>
+        <x>48</x>
+        <y>5</y>
+        <width>49</width>
+        <height>14</height>
+        <description>活動報告タイトル（例：2025年度 活動報告）</description>
+        <required>true</required>
+        <max_chars>18</max_chars>
+        <font_size_guideline>18px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#333333</color>
+      </slot>
+      <slot>
+        <id>achievement_1</id>
+        <type>text</type>
+        <x>48</x>
+        <y>22</y>
+        <width>49</width>
+        <height>10</height>
+        <description>実績数字1（例：保護頭数: 523匹）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#2196F3</color>
+      </slot>
+      <slot>
+        <id>achievement_2</id>
+        <type>text</type>
+        <x>48</x>
+        <y>34</y>
+        <width>49</width>
+        <height>10</height>
+        <description>実績数字2（例：譲渡完了: 489匹）</description>
+        <required>false</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#27AE60</color>
+      </slot>
+      <slot>
+        <id>achievement_3</id>
+        <type>text</type>
+        <x>48</x>
+        <y>46</y>
+        <width>49</width>
+        <height>10</height>
+        <description>実績数字3（例：支援者数: 2,100人）</description>
+        <required>false</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#E67E22</color>
+      </slot>
+      <slot>
+        <id>message</id>
+        <type>text</type>
+        <x>48</x>
+        <y>58</y>
+        <width>49</width>
+        <height>14</height>
+        <description>メッセージ（例：皆さまのご支援のおかげで活動を継続できています）</description>
+        <required>false</required>
+        <max_chars>35</max_chars>
+        <font_size_guideline>12px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>support_button</id>
+        <type>button</type>
+        <x>48</x>
+        <y>76</y>
+        <width>49</width>
+        <height>20</height>
+        <description>継続支援ページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>活動を支援する</default_label>
+        <bg_color>#2196F3</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>activity_photo は必須入力です。実際の活動の様子が伝わる写真を推奨します。</rule>
+      <rule>report_title は必須入力です。18文字以内で年度・内容を明示してください。</rule>
+      <rule>achievement_1 は必須入力です。最も重要な実績数字を記載してください。</rule>
+      <rule>実績数字は具体的な数値を含めると信頼性が高まります。</rule>
+      <rule>support_button のラベルは行動喚起を明確にしてください。</rule>
+    </rules>
+  </banner_template>
+
+</banner_templates>

@@ -1,0 +1,39 @@
+<div class="space-y-4">
+  {% for slot in slots %}
+  <div id="slot-{{ slot.id }}" class="border border-gray-200 rounded-lg p-3">
+    <!-- Slot header -->
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex items-center gap-2">
+        <h4 class="text-sm font-semibold text-gray-700">{{ slot.id }}</h4>
+        {% if slot.required %}
+        <span class="text-[10px] font-semibold uppercase bg-red-100 text-red-600 px-1.5 py-0.5 rounded">必須</span>
+        {% endif %}
+      </div>
+      <span class="text-[10px] font-medium uppercase bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{{ slot.type.value }}</span>
+    </div>
+
+    {% if slot.description %}
+    <p class="text-xs text-gray-400 mb-2">{{ slot.description }}</p>
+    {% endif %}
+
+    <!-- Slot-type-specific editor -->
+    {% if slot.type.value == 'text' %}
+      {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
+        {% include "components/slot_types/text_slot.html" %}
+      {% endwith %}
+    {% elif slot.type.value == 'image' %}
+      {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
+        {% include "components/slot_types/image_slot.html" %}
+      {% endwith %}
+    {% elif slot.type.value == 'button' %}
+      {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
+        {% include "components/slot_types/button_slot.html" %}
+      {% endwith %}
+    {% elif slot.type.value == 'image_or_text' %}
+      {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
+        {% include "components/slot_types/image_or_text_slot.html" %}
+      {% endwith %}
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>

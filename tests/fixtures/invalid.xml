@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template>
+  <meta>
+    <category>broken</category>
+    <pattern_id>invalid_01</pattern_id>
+    <!-- Missing closing tag intentionally -->
+    <pattern_name>This is broken
+  </meta>
+  <design>
+    <background_type>solid</background_type>
+</template>

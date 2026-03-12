@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template>
+  <meta>
+    <category>used_car</category>
+    <pattern_id>car_01</pattern_id>
+    <pattern_name>Classic Car Banner</pattern_name>
+    <width>1200</width>
+    <height>628</height>
+    <unit>px</unit>
+    <aspect_ratio>1.91:1</aspect_ratio>
+    <layout_type>hero_image</layout_type>
+    <recommended_use>Social media ad for used car dealership</recommended_use>
+  </meta>
+  <design>
+    <background_type>solid</background_type>
+    <background_value>#1a1a2e</background_value>
+    <primary_color>#e94560</primary_color>
+    <accent_color>#0f3460</accent_color>
+    <font_style>modern</font_style>
+  </design>
+  <slots>
+    <slot>
+      <id>hero_image</id>
+      <type>image</type>
+      <x>0%</x>
+      <y>0%</y>
+      <width>60%</width>
+      <height>100%</height>
+      <description>Main car photo</description>
+      <required>true</required>
+      <format_hint>JPG or PNG, 1200x628 recommended</format_hint>
+    </slot>
+    <slot>
+      <id>headline</id>
+      <type>text</type>
+      <x>62%</x>
+      <y>10%</y>
+      <width>35%</width>
+      <height>15%</height>
+      <description>Main headline text</description>
+      <required>true</required>
+      <max_chars>30</max_chars>
+      <font_size_guideline>32px</font_size_guideline>
+      <font_weight>bold</font_weight>
+      <color>#ffffff</color>
+    </slot>
+    <slot>
+      <id>price_tag</id>
+      <type>text</type>
+      <x>62%</x>
+      <y>30%</y>
+      <width>35%</width>
+      <height>12%</height>
+      <description>Price display</description>
+      <required>true</required>
+      <max_chars>15</max_chars>
+      <font_size_guideline>28px</font_size_guideline>
+      <font_weight>bold</font_weight>
+      <color>#e94560</color>
+    </slot>
+    <slot>
+      <id>description</id>
+      <type>text</type>
+      <x>62%</x>
+      <y>45%</y>
+      <width>35%</width>
+      <height>20%</height>
+      <description>Vehicle description</description>
+      <required>false</required>
+      <max_chars>100</max_chars>
+      <font_size_guideline>14px</font_size_guideline>
+      <color>#cccccc</color>
+    </slot>
+    <slot>
+      <id>logo</id>
+      <type>image_or_text</type>
+      <x>62%</x>
+      <y>70%</y>
+      <width>15%</width>
+      <height>10%</height>
+      <description>Dealer logo or name</description>
+      <required>false</required>
+      <max_chars>20</max_chars>
+    </slot>
+    <slot>
+      <id>cta_button</id>
+      <type>button</type>
+      <x>62%</x>
+      <y>85%</y>
+      <width>35%</width>
+      <height>10%</height>
+      <description>Call to action button</description>
+      <required>true</required>
+      <default_label>View Details</default_label>
+      <bg_color>#e94560</bg_color>
+      <text_color>#ffffff</text_color>
+      <font_size_guideline>16px</font_size_guideline>
+    </slot>
+  </slots>
+  <rules>
+    <rule>Headline text must be concise and impactful</rule>
+    <rule>Car image should be high quality and well-lit</rule>
+    <rule>Price must include currency symbol</rule>
+  </rules>
+</template>

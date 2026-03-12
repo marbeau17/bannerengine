@@ -1,0 +1,451 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<banner_templates category="apparel">
+
+  <!-- ======================================================================
+       apparel_01: シーズンビジュアル型 (1200x630)
+       モデル写真フル＋ブランドロゴでシーズンコレクション訴求
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>apparel</category>
+      <pattern_id>apparel_01</pattern_id>
+      <pattern_name>シーズンビジュアル型</pattern_name>
+      <width>1200</width>
+      <height>630</height>
+      <unit>px</unit>
+      <aspect_ratio>40:21</aspect_ratio>
+      <layout_type>full_background</layout_type>
+      <recommended_use>OGP画像・Facebook/Instagram広告</recommended_use>
+    </meta>
+    <design>
+      <background_type>image</background_type>
+      <background_value>#000000</background_value>
+      <overlay_type>gradient</overlay_type>
+      <overlay_opacity>0.35</overlay_opacity>
+      <primary_color>#FFFFFF</primary_color>
+      <accent_color>#C8A96E</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>center_overlay</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>model_photo</id>
+        <type>image</type>
+        <x>0</x>
+        <y>0</y>
+        <width>100</width>
+        <height>100</height>
+        <description>モデル写真（フルサイズ背景、シーズンの雰囲気を伝える）</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 2400x1260px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>brand_logo</id>
+        <type>image</type>
+        <x>5</x>
+        <y>5</y>
+        <width>18</width>
+        <height>10</height>
+        <description>ブランドロゴ</description>
+        <required>false</required>
+        <format_hint>PNG with transparency</format_hint>
+      </slot>
+      <slot>
+        <id>season_label</id>
+        <type>text</type>
+        <x>10</x>
+        <y>28</y>
+        <width>80</width>
+        <height>8</height>
+        <description>シーズンラベル（例：2026 SPRING / SUMMER）</description>
+        <required>true</required>
+        <max_chars>30</max_chars>
+        <font_size_guideline>18px</font_size_guideline>
+        <color>#C8A96E</color>
+      </slot>
+      <slot>
+        <id>collection_name</id>
+        <type>text</type>
+        <x>10</x>
+        <y>38</y>
+        <width>80</width>
+        <height>16</height>
+        <description>コレクション名（例：NEW COLLECTION）</description>
+        <required>true</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>48px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#FFFFFF</color>
+      </slot>
+      <slot>
+        <id>sub_copy</id>
+        <type>text</type>
+        <x>15</x>
+        <y>56</y>
+        <width>70</width>
+        <height>8</height>
+        <description>サブコピー（例：この春、新しい自分に出会う。）</description>
+        <required>false</required>
+        <max_chars>30</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <color>#E0E0E0</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>30</x>
+        <y>70</y>
+        <width>40</width>
+        <height>12</height>
+        <description>コレクションページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>SHOP NOW</default_label>
+        <bg_color>#C8A96E</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>model_photo は必須入力です。シーズンの雰囲気が伝わるモデル写真を推奨します。</rule>
+      <rule>season_label は最大30文字です。シーズン名を英語で記載することを推奨します。</rule>
+      <rule>collection_name は最大25文字です。コレクション名を大きく表示してください。</rule>
+      <rule>テキストはオーバーレイ上に配置されるため白系を推奨します。</rule>
+      <rule>brand_logo を使用する場合は透過PNGを推奨します。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       apparel_02: セール告知型 (996x998)
+       大きな割引率＋商品写真でセールを告知
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>apparel</category>
+      <pattern_id>apparel_02</pattern_id>
+      <pattern_name>セール告知型</pattern_name>
+      <width>996</width>
+      <height>998</height>
+      <unit>px</unit>
+      <aspect_ratio>498:499</aspect_ratio>
+      <layout_type>copy_focused</layout_type>
+      <recommended_use>Instagram投稿・セール告知</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#1A1A1A</background_value>
+      <primary_color>#FFFFFF</primary_color>
+      <accent_color>#FF3B3B</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>bold_sale</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>sale_label</id>
+        <type>text</type>
+        <x>5</x>
+        <y>3</y>
+        <width>90</width>
+        <height>8</height>
+        <description>セールラベル（例：FINAL SALE）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>28px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#FF3B3B</color>
+      </slot>
+      <slot>
+        <id>discount_rate</id>
+        <type>text</type>
+        <x>10</x>
+        <y>13</y>
+        <width>80</width>
+        <height>18</height>
+        <description>割引率（例：MAX 70% OFF）</description>
+        <required>true</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>64px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#FFFFFF</color>
+      </slot>
+      <slot>
+        <id>product_image</id>
+        <type>image</type>
+        <x>5</x>
+        <y>33</y>
+        <width>90</width>
+        <height>35</height>
+        <description>セール対象商品の写真（コーディネートまたは複数アイテム）</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 1792x698px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>catch_copy</id>
+        <type>text</type>
+        <x>5</x>
+        <y>70</y>
+        <width>90</width>
+        <height>8</height>
+        <description>キャッチコピー（例：人気アイテムが今だけ特別価格）</description>
+        <required>false</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>18px</font_size_guideline>
+        <color>#E0E0E0</color>
+      </slot>
+      <slot>
+        <id>sale_period</id>
+        <type>text</type>
+        <x>5</x>
+        <y>79</y>
+        <width>90</width>
+        <height>5</height>
+        <description>セール期間（例：3/15(土)〜3/31(月) 23:59まで）</description>
+        <required>false</required>
+        <max_chars>30</max_chars>
+        <font_size_guideline>14px</font_size_guideline>
+        <color>#999999</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>15</x>
+        <y>86</y>
+        <width>70</width>
+        <height>12</height>
+        <description>セールページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>SALE会場へ</default_label>
+        <bg_color>#FF3B3B</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>sale_label は必須入力です。セール種別を明確にしてください。</rule>
+      <rule>discount_rate は必須入力です。最大割引率を大きく目立たせてください。</rule>
+      <rule>product_image は必須入力です。セール対象の魅力的な商品写真を推奨します。</rule>
+      <rule>sale_period にセール終了日時を明記すると緊急感が高まります。</rule>
+      <rule>cta_button のコントラスト比は WCAG AA 基準を確保してください。</rule>
+      <rule>暗い背景色に対してテキストは白系で統一してください。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       apparel_03: コーディネート提案型 (380x380)
+       コーデ写真＋アイテム価格で提案
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>apparel</category>
+      <pattern_id>apparel_03</pattern_id>
+      <pattern_name>コーディネート提案型</pattern_name>
+      <width>380</width>
+      <height>380</height>
+      <unit>px</unit>
+      <aspect_ratio>1:1</aspect_ratio>
+      <layout_type>full_background</layout_type>
+      <recommended_use>SNS投稿・コーデ提案サムネイル</recommended_use>
+    </meta>
+    <design>
+      <background_type>image</background_type>
+      <background_value>#FAFAFA</background_value>
+      <overlay_type>gradient</overlay_type>
+      <overlay_opacity>0.3</overlay_opacity>
+      <primary_color>#333333</primary_color>
+      <accent_color>#E91E63</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>bottom_info_bar</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>coordinate_photo</id>
+        <type>image</type>
+        <x>0</x>
+        <y>0</y>
+        <width>100</width>
+        <height>68</height>
+        <description>コーディネート全身写真</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 760x516px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>coordinate_title</id>
+        <type>text</type>
+        <x>3</x>
+        <y>70</y>
+        <width>94</width>
+        <height>8</height>
+        <description>コーデタイトル（例：春の大人カジュアルコーデ）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>15px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#333333</color>
+      </slot>
+      <slot>
+        <id>total_price</id>
+        <type>text</type>
+        <x>3</x>
+        <y>79</y>
+        <width>50</width>
+        <height>8</height>
+        <description>コーデ合計金額（例：トータル ¥15,800）</description>
+        <required>true</required>
+        <max_chars>18</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#E91E63</color>
+      </slot>
+      <slot>
+        <id>item_count</id>
+        <type>text</type>
+        <x>55</x>
+        <y>79</y>
+        <width>42</width>
+        <height>8</height>
+        <description>アイテム数（例：全3アイテム）</description>
+        <required>false</required>
+        <max_chars>10</max_chars>
+        <font_size_guideline>12px</font_size_guideline>
+        <color>#999999</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>0</x>
+        <y>88</y>
+        <width>100</width>
+        <height>12</height>
+        <description>コーデ詳細ページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>このコーデを見る</default_label>
+        <bg_color>#E91E63</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>coordinate_photo は必須入力です。全身が映ったコーディネート写真を推奨します。</rule>
+      <rule>coordinate_title は最大20文字です。コーデのテーマを簡潔に記載してください。</rule>
+      <rule>total_price は必須入力です。コーディネート全体の合計金額を記載してください。</rule>
+      <rule>画像は最低760x516px以上の解像度を推奨します。</rule>
+      <rule>cta_button のコントラスト比は WCAG AA 基準を確保してください。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       apparel_04: 複数アイテム型 (600x254)
+       アイテムグリッド＋SHOP NOWで複数商品を訴求
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>apparel</category>
+      <pattern_id>apparel_04</pattern_id>
+      <pattern_name>複数アイテム型</pattern_name>
+      <width>600</width>
+      <height>254</height>
+      <unit>px</unit>
+      <aspect_ratio>300:127</aspect_ratio>
+      <layout_type>grid</layout_type>
+      <recommended_use>ウェブバナー・メルマガ挿入画像</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#FAFAFA</background_value>
+      <primary_color>#212121</primary_color>
+      <accent_color>#000000</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>item_grid</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>header_copy</id>
+        <type>text</type>
+        <x>3</x>
+        <y>3</y>
+        <width>60</width>
+        <height>14</height>
+        <description>ヘッダーコピー（例：PICK UP ITEMS）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>18px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#212121</color>
+      </slot>
+      <slot>
+        <id>item_image_1</id>
+        <type>image</type>
+        <x>3</x>
+        <y>20</y>
+        <width>23</width>
+        <height>50</height>
+        <description>アイテム写真1</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG</format_hint>
+      </slot>
+      <slot>
+        <id>item_image_2</id>
+        <type>image</type>
+        <x>28</x>
+        <y>20</y>
+        <width>23</width>
+        <height>50</height>
+        <description>アイテム写真2</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG</format_hint>
+      </slot>
+      <slot>
+        <id>item_image_3</id>
+        <type>image</type>
+        <x>53</x>
+        <y>20</y>
+        <width>23</width>
+        <height>50</height>
+        <description>アイテム写真3</description>
+        <required>false</required>
+        <format_hint>JPEG or PNG</format_hint>
+      </slot>
+      <slot>
+        <id>item_image_4</id>
+        <type>image</type>
+        <x>78</x>
+        <y>20</y>
+        <width>19</width>
+        <height>50</height>
+        <description>アイテム写真4</description>
+        <required>false</required>
+        <format_hint>JPEG or PNG</format_hint>
+      </slot>
+      <slot>
+        <id>price_range</id>
+        <type>text</type>
+        <x>3</x>
+        <y>73</y>
+        <width>55</width>
+        <height>8</height>
+        <description>価格帯（例：¥3,990〜¥12,900）</description>
+        <required>false</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>13px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>60</x>
+        <y>73</y>
+        <width>37</width>
+        <height>24</height>
+        <description>ショップページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>SHOP NOW</default_label>
+        <bg_color>#000000</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>header_copy は必須入力です。20文字以内で簡潔に記載してください。</rule>
+      <rule>item_image_1 および item_image_2 は必須入力です。</rule>
+      <rule>アイテム写真はモデル着用またはフラットレイで統一してください。</rule>
+      <rule>グリッド内の画像アスペクト比は統一を推奨します。</rule>
+      <rule>cta_button のコントラスト比は WCAG AA 基準を確保してください。</rule>
+    </rules>
+  </banner_template>
+
+</banner_templates>

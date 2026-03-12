@@ -1,0 +1,523 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<banner_templates category="ramen">
+
+  <!-- ======================================================================
+       ramen_01: メニュー訴求型 (380x380)
+       ラーメン写真フル＋商品名・価格で単品メニューを訴求
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>ramen</category>
+      <pattern_id>ramen_01</pattern_id>
+      <pattern_name>メニュー訴求型</pattern_name>
+      <width>380</width>
+      <height>380</height>
+      <unit>px</unit>
+      <aspect_ratio>1:1</aspect_ratio>
+      <layout_type>full_background</layout_type>
+      <recommended_use>SNS広告・グルメサイトサムネイル</recommended_use>
+    </meta>
+    <design>
+      <background_type>image</background_type>
+      <background_value>#1A1A1A</background_value>
+      <overlay_type>gradient</overlay_type>
+      <overlay_opacity>0.3</overlay_opacity>
+      <primary_color>#FFFFFF</primary_color>
+      <accent_color>#CC0000</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>bottom_dark</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>menu_photo</id>
+        <type>image</type>
+        <x>0</x>
+        <y>0</y>
+        <width>100</width>
+        <height>70</height>
+        <description>ラーメンの写真（湯気・トッピングが見える構図推奨）</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 760x532px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>menu_name</id>
+        <type>text</type>
+        <x>3</x>
+        <y>71</y>
+        <width>65</width>
+        <height>10</height>
+        <description>メニュー名（例：特製味噌ラーメン）</description>
+        <required>true</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>22px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#000000</color>
+      </slot>
+      <slot>
+        <id>price</id>
+        <type>text</type>
+        <x>68</x>
+        <y>71</y>
+        <width>29</width>
+        <height>10</height>
+        <description>価格（例：¥980）</description>
+        <required>true</required>
+        <max_chars>8</max_chars>
+        <font_size_guideline>24px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#CC0000</color>
+      </slot>
+      <slot>
+        <id>shop_name</id>
+        <type>text</type>
+        <x>3</x>
+        <y>82</y>
+        <width>50</width>
+        <height>6</height>
+        <description>店名（例：麺屋 一番星）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>12px</font_size_guideline>
+        <color>#333333</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>0</x>
+        <y>88</y>
+        <width>100</width>
+        <height>12</height>
+        <description>場所確認・予約ページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>場所を確認する</default_label>
+        <bg_color>#CC0000</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>menu_photo は必須入力です。ラーメンの湯気やトッピングが見える写真を推奨します。</rule>
+      <rule>menu_name は最大15文字です。メニュー名を正確に記載してください。</rule>
+      <rule>price は最大8文字です。税込み価格を記載してください。</rule>
+      <rule>shop_name は最大20文字です。</rule>
+      <rule>画像は最低760x532px以上の解像度を推奨します。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       ramen_02: 新メニュー告知型 (1200x630)
+       NEW!バッジ＋大きなメニュー写真で新メニューを告知
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>ramen</category>
+      <pattern_id>ramen_02</pattern_id>
+      <pattern_name>新メニュー告知型</pattern_name>
+      <width>1200</width>
+      <height>630</height>
+      <unit>px</unit>
+      <aspect_ratio>40:21</aspect_ratio>
+      <layout_type>full_background</layout_type>
+      <recommended_use>OGP画像・グルメサイトバナー</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#2C1810</background_value>
+      <primary_color>#FFFFFF</primary_color>
+      <accent_color>#FF4444</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>new_menu_splash</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>new_badge</id>
+        <type>text</type>
+        <x>3</x>
+        <y>3</y>
+        <width>20</width>
+        <height>10</height>
+        <description>NEWバッジ（例：NEW!）</description>
+        <required>true</required>
+        <max_chars>8</max_chars>
+        <font_size_guideline>28px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#FF4444</color>
+      </slot>
+      <slot>
+        <id>menu_photo</id>
+        <type>image</type>
+        <x>5</x>
+        <y>15</y>
+        <width>50</width>
+        <height>65</height>
+        <description>新メニューの写真（大きくインパクトのある構図）</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 1200x819px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>menu_name</id>
+        <type>text</type>
+        <x>58</x>
+        <y>18</y>
+        <width>38</width>
+        <height>14</height>
+        <description>新メニュー名（例：極上濃厚魚介つけ麺）</description>
+        <required>true</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>30px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#FFFFFF</color>
+      </slot>
+      <slot>
+        <id>catch_copy</id>
+        <type>text</type>
+        <x>58</x>
+        <y>35</y>
+        <width>38</width>
+        <height>12</height>
+        <description>キャッチコピー（例：48時間煮込んだ特製スープ）</description>
+        <required>true</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <color>#E0E0E0</color>
+      </slot>
+      <slot>
+        <id>price</id>
+        <type>text</type>
+        <x>58</x>
+        <y>50</y>
+        <width>38</width>
+        <height>12</height>
+        <description>価格（例：¥1,180（税込））</description>
+        <required>true</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>28px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#FF4444</color>
+      </slot>
+      <slot>
+        <id>shop_name</id>
+        <type>text</type>
+        <x>58</x>
+        <y>65</y>
+        <width>38</width>
+        <height>6</height>
+        <description>店名（例：麺屋 一番星 渋谷本店）</description>
+        <required>true</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>14px</font_size_guideline>
+        <color>#CCCCCC</color>
+      </slot>
+      <slot>
+        <id>availability</id>
+        <type>text</type>
+        <x>58</x>
+        <y>72</y>
+        <width>38</width>
+        <height>5</height>
+        <description>販売期間（例：期間限定 3/1〜4/30）</description>
+        <required>false</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>12px</font_size_guideline>
+        <color>#999999</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>58</x>
+        <y>80</y>
+        <width>38</width>
+        <height>14</height>
+        <description>詳細・予約ページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>食べに行く</default_label>
+        <bg_color>#FF4444</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>new_badge は必須入力です。「NEW」「新登場」などの短いテキストを記載してください。</rule>
+      <rule>menu_photo は必須入力です。食欲をそそる高解像度写真を推奨します。</rule>
+      <rule>menu_name は最大15文字です。メニュー名を正確に記載してください。</rule>
+      <rule>catch_copy は最大25文字です。メニューの特長・こだわりを伝えてください。</rule>
+      <rule>price は必須入力です。税込み価格を記載してください。</rule>
+      <rule>暗い背景色に対してテキストは明るい色で統一してください。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       ramen_03: 店舗宣伝型 (996x998)
+       店舗外観/内観＋営業時間＋地図QRで店舗を宣伝
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>ramen</category>
+      <pattern_id>ramen_03</pattern_id>
+      <pattern_name>店舗宣伝型</pattern_name>
+      <width>996</width>
+      <height>998</height>
+      <unit>px</unit>
+      <aspect_ratio>498:499</aspect_ratio>
+      <layout_type>copy_focused</layout_type>
+      <recommended_use>Instagram投稿・グルメサイト・店頭ポスター</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#FFF8E1</background_value>
+      <primary_color>#3E2723</primary_color>
+      <accent_color>#D84315</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>shop_info_card</highlight_panel>
+      <illustration_style>japanese_pattern</illustration_style>
+    </design>
+    <slots>
+      <slot>
+        <id>shop_photo</id>
+        <type>image</type>
+        <x>5</x>
+        <y>3</y>
+        <width>90</width>
+        <height>35</height>
+        <description>店舗外観または内観の写真</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 1792x698px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>shop_name</id>
+        <type>text</type>
+        <x>5</x>
+        <y>40</y>
+        <width>90</width>
+        <height>10</height>
+        <description>店名（例：麺屋 一番星）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>32px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#3E2723</color>
+      </slot>
+      <slot>
+        <id>catch_copy</id>
+        <type>text</type>
+        <x>5</x>
+        <y>51</y>
+        <width>90</width>
+        <height>7</height>
+        <description>キャッチコピー（例：創業30年、伝統の一杯をあなたに。）</description>
+        <required>true</required>
+        <max_chars>30</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>signature_photo</id>
+        <type>image</type>
+        <x>5</x>
+        <y>60</y>
+        <width>40</width>
+        <height>20</height>
+        <description>看板メニューの写真</description>
+        <required>false</required>
+        <format_hint>JPEG or PNG</format_hint>
+      </slot>
+      <slot>
+        <id>business_hours</id>
+        <type>text</type>
+        <x>48</x>
+        <y>60</y>
+        <width>47</width>
+        <height>6</height>
+        <description>営業時間（例：11:00〜22:00（L.O. 21:30））</description>
+        <required>true</required>
+        <max_chars>30</max_chars>
+        <font_size_guideline>13px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>address</id>
+        <type>text</type>
+        <x>48</x>
+        <y>67</y>
+        <width>47</width>
+        <height>6</height>
+        <description>住所（例：東京都渋谷区道玄坂1-2-3）</description>
+        <required>true</required>
+        <max_chars>30</max_chars>
+        <font_size_guideline>12px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>holiday</id>
+        <type>text</type>
+        <x>48</x>
+        <y>74</y>
+        <width>47</width>
+        <height>5</height>
+        <description>定休日（例：毎週火曜定休）</description>
+        <required>false</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>12px</font_size_guideline>
+        <color>#999999</color>
+      </slot>
+      <slot>
+        <id>map_qr</id>
+        <type>image</type>
+        <x>75</x>
+        <y>80</y>
+        <width>18</width>
+        <height>18</height>
+        <description>Google Maps QRコード</description>
+        <required>false</required>
+        <format_hint>PNG, square format</format_hint>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>5</x>
+        <y>83</y>
+        <width>65</width>
+        <height>15</height>
+        <description>予約・地図ページへのCTAボタン</description>
+        <required>true</required>
+        <default_label>地図を見る・予約する</default_label>
+        <bg_color>#D84315</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>shop_photo は必須入力です。お店の雰囲気が伝わる写真を推奨します。</rule>
+      <rule>shop_name は最大20文字です。正式な店名を記載してください。</rule>
+      <rule>catch_copy は最大30文字です。お店の魅力・こだわりを伝えてください。</rule>
+      <rule>business_hours と address は必須入力です。正確な情報を記載してください。</rule>
+      <rule>map_qr を設置すると来店率が向上します。正方形のQR画像を推奨します。</rule>
+      <rule>cta_button のコントラスト比は WCAG AA 基準を確保してください。</rule>
+    </rules>
+  </banner_template>
+
+  <!-- ======================================================================
+       ramen_04: クーポン型 (600x254)
+       割引情報＋メニュー写真＋有効期限でクーポンを訴求
+       ====================================================================== -->
+  <banner_template>
+    <meta>
+      <category>ramen</category>
+      <pattern_id>ramen_04</pattern_id>
+      <pattern_name>クーポン型</pattern_name>
+      <width>600</width>
+      <height>254</height>
+      <unit>px</unit>
+      <aspect_ratio>300:127</aspect_ratio>
+      <layout_type>grid</layout_type>
+      <recommended_use>ウェブバナー・メルマガ・クーポンサイト</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#FFF8E1</background_value>
+      <primary_color>#333333</primary_color>
+      <accent_color>#E65100</accent_color>
+      <font_style>NotoSansJP</font_style>
+      <highlight_panel>coupon_dashed_border</highlight_panel>
+    </design>
+    <slots>
+      <slot>
+        <id>menu_photo</id>
+        <type>image</type>
+        <x>0</x>
+        <y>0</y>
+        <width>40</width>
+        <height>100</height>
+        <description>対象メニューの写真</description>
+        <required>true</required>
+        <format_hint>JPEG or PNG, 480x508px recommended</format_hint>
+      </slot>
+      <slot>
+        <id>coupon_title</id>
+        <type>text</type>
+        <x>43</x>
+        <y>5</y>
+        <width>54</width>
+        <height>14</height>
+        <description>クーポンタイトル（例：お得なクーポン）</description>
+        <required>true</required>
+        <max_chars>12</max_chars>
+        <font_size_guideline>20px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#333333</color>
+      </slot>
+      <slot>
+        <id>discount_text</id>
+        <type>text</type>
+        <x>43</x>
+        <y>22</y>
+        <width>54</width>
+        <height>22</height>
+        <description>割引内容（例：100円引き / トッピング無料）</description>
+        <required>true</required>
+        <max_chars>15</max_chars>
+        <font_size_guideline>32px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#E65100</color>
+      </slot>
+      <slot>
+        <id>target_menu</id>
+        <type>text</type>
+        <x>43</x>
+        <y>47</y>
+        <width>54</width>
+        <height>10</height>
+        <description>対象メニュー（例：全ラーメンメニュー対象）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>14px</font_size_guideline>
+        <color>#666666</color>
+      </slot>
+      <slot>
+        <id>shop_name</id>
+        <type>text</type>
+        <x>43</x>
+        <y>59</y>
+        <width>54</width>
+        <height>8</height>
+        <description>店名（例：麺屋 一番星）</description>
+        <required>true</required>
+        <max_chars>20</max_chars>
+        <font_size_guideline>13px</font_size_guideline>
+        <font_weight>bold</font_weight>
+        <color>#333333</color>
+      </slot>
+      <slot>
+        <id>expiry_date</id>
+        <type>text</type>
+        <x>43</x>
+        <y>69</y>
+        <width>54</width>
+        <height>8</height>
+        <description>有効期限（例：有効期限: 2026/4/30まで）</description>
+        <required>true</required>
+        <max_chars>25</max_chars>
+        <font_size_guideline>11px</font_size_guideline>
+        <color>#999999</color>
+      </slot>
+      <slot>
+        <id>cta_button</id>
+        <type>button</type>
+        <x>43</x>
+        <y>80</y>
+        <width>54</width>
+        <height>18</height>
+        <description>クーポン利用ボタン</description>
+        <required>true</required>
+        <default_label>クーポンを使う</default_label>
+        <bg_color>#E65100</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>menu_photo は必須入力です。対象メニューの食欲をそそる写真を推奨します。</rule>
+      <rule>coupon_title は最大12文字です。</rule>
+      <rule>discount_text は必須入力です。割引内容を大きく目立たせてください。</rule>
+      <rule>expiry_date は必須入力です。有効期限を明記してください。</rule>
+      <rule>cta_button のコントラスト比は WCAG AA 基準を確保してください。</rule>
+    </rules>
+  </banner_template>
+
+</banner_templates>
