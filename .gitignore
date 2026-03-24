@@ -39,7 +39,11 @@ htmlcov/
 # Application specific
 output/
 static/uploads/
+static/generated/
 
 # OS
 .DS_Store
 Thumbs.db
+.claude/
+
+.vercel

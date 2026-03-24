@@ -28,8 +28,10 @@ class ImageSlotValue(SlotValue):
     """Value for an image slot."""
 
     slot_type: str = "image"
-    image_url: str
+    image_url: Optional[str] = None
     fit: str = "cover"
+    prompt: Optional[str] = None  # AI image generation prompt
+    generation_model: str = "nano-bannara-pro-2"  # Model to use for generation
 
 
 class ButtonSlotValue(SlotValue):

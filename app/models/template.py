@@ -75,6 +75,10 @@ class Slot(BaseModel):
     # General optional fields
     format_hint: Optional[str] = None
 
+    # Prompt / AI-generation fields
+    prompt_placeholder: Optional[str] = None  # Hint text for AI prompt input
+    allow_ai_generation: bool = True  # Whether this slot supports AI image generation
+
 
 class BannerTemplate(BaseModel):
     """Complete banner template parsed from XML."""

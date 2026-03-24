@@ -79,6 +79,12 @@ try:
 except (ImportError, AttributeError) as exc:
     logger.warning("Could not import assets router: %s", exc)
 
+try:
+    from app.routers import image_generate
+    _routers.append(image_generate.router)
+except (ImportError, AttributeError) as exc:
+    logger.warning("Could not import image_generate router: %s", exc)
+
 
 # ---------------------------------------------------------------------------
 # Startup / shutdown logic
@@ -97,6 +103,15 @@ def _load_xml_templates(app_instance: FastAPI) -> None:
         renderer = SvgRenderer()
         app_instance.state.svg_renderer = renderer
 
+        # Initialize image generation services
+        from app.services.nano_banana_client import NanoBananaClient
+        from app.services.image_generation_service import ImageGenerationService
+
+        api_key = os.getenv("GOOGLE_AI_API_KEY", "")
+        nano_client = NanoBananaClient(api_key=api_key)
+        app_instance.state.nano_banana_client = nano_client
+        app_instance.state.image_generation_service = ImageGenerationService(nano_client)
+
         logger.info(
             "XML templates loaded successfully (%d templates)",
             len(service.get_all_templates()),
@@ -108,6 +123,11 @@ def _load_xml_templates(app_instance: FastAPI) -> None:
         from app.core.svg_renderer import SvgRenderer
         app_instance.state.template_service = TemplateService()
         app_instance.state.svg_renderer = SvgRenderer()
+        from app.services.nano_banana_client import NanoBananaClient
+        from app.services.image_generation_service import ImageGenerationService
+        nano_client = NanoBananaClient(api_key="")
+        app_instance.state.nano_banana_client = nano_client
+        app_instance.state.image_generation_service = ImageGenerationService(nano_client)
 
 
 @asynccontextmanager

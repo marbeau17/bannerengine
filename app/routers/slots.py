@@ -95,7 +95,12 @@ async def update_slot(request: Request, pattern_id: str, slot_id: str):
             "text_color": form_data.get("text_color", slot.text_color or "#ffffff"),
         }
     elif slot_type == "image":
-        session_slots[slot_id] = str(value)
+        prompt = form_data.get("prompt", "")
+        session_slots[slot_id] = {
+            "source_url": str(value),
+            "prompt": str(prompt) if prompt else "",
+            "fit": form_data.get("fit", "cover"),
+        }
     else:
         session_slots[slot_id] = str(value)
     _set_session_slots(request, pattern_id, session_slots)

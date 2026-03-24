@@ -8,7 +8,7 @@
     ondrop="event.preventDefault(); this.classList.remove('border-indigo-400', 'bg-indigo-50'); handleFileDrop(event, '{{ current_slot.id }}')"
     onclick="this.querySelector('input[type=file]').click()"
   >
-    {% if current_value.get('source_url') %}
+    {% if current_value is mapping and current_value.get('source_url') %}
     <!-- Preview thumbnail -->
     <img
       src="{{ current_value.get('source_url') }}"
@@ -46,6 +46,69 @@
   {% if current_slot.format_hint %}
   <p class="text-[11px] text-gray-400">推奨: {{ current_slot.format_hint }}</p>
   {% endif %}
+
+  <!-- AI Image Generation Section -->
+  <div class="border-t border-gray-200 pt-3 mt-3">
+    <button
+      type="button"
+      class="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+      onclick="toggleAiGeneration('{{ current_slot.id }}')"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+      </svg>
+      AI画像生成 (NanoBannaraPro2)
+    </button>
+
+    <div id="ai-gen-{{ current_slot.id }}" class="hidden mt-2 space-y-2">
+      <textarea
+        id="prompt-{{ current_slot.id }}"
+        name="prompt"
+        rows="3"
+        class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+        placeholder="{{ current_slot.prompt_placeholder or '例: 赤いスポーツカー、白い背景、プロフェッショナルな写真風' }}"
+      >{{ (current_value.get('prompt') if current_value is mapping else '') or '' }}</textarea>
+
+      <button
+        type="button"
+        class="w-full py-2 px-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-xs font-semibold rounded-lg shadow transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+        onclick="startImageGeneration('{{ pattern_id }}', '{{ current_slot.id }}')"
+      >
+        <span id="gen-btn-text-{{ current_slot.id }}">画像を生成</span>
+        <span id="gen-btn-spinner-{{ current_slot.id }}" class="hidden">
+          <svg class="animate-spin inline h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+          生成中...
+        </span>
+      </button>
+
+      <!-- Progress bar -->
+      <div id="gen-progress-{{ current_slot.id }}" class="hidden">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[11px] text-gray-500">生成中...</span>
+          <span id="gen-progress-text-{{ current_slot.id }}" class="text-[11px] text-gray-500">0%</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-1.5">
+          <div id="gen-progress-bar-{{ current_slot.id }}" class="bg-indigo-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Generation result preview -->
+      <div id="gen-result-{{ current_slot.id }}" class="hidden">
+        <img id="gen-result-img-{{ current_slot.id }}" src="" alt="Generated image" class="w-full rounded-lg border border-gray-200">
+        <button
+          type="button"
+          class="w-full mt-1.5 py-1.5 px-3 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors"
+          onclick="applyGeneratedImage('{{ pattern_id }}', '{{ current_slot.id }}')"
+        >
+          この画像を適用
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -54,5 +117,114 @@
     const fileInput = form.querySelector('input[type=file]');
     fileInput.files = event.dataTransfer.files;
     htmx.trigger(form, 'submit');
+  }
+
+  function toggleAiGeneration(slotId) {
+    const panel = document.getElementById('ai-gen-' + slotId);
+    panel.classList.toggle('hidden');
+  }
+
+  function startImageGeneration(patternId, slotId) {
+    const prompt = document.getElementById('prompt-' + slotId).value.trim();
+    if (!prompt) {
+      showToast('プロンプトを入力してください', 'warning');
+      return;
+    }
+
+    // Show loading state
+    document.getElementById('gen-btn-text-' + slotId).classList.add('hidden');
+    document.getElementById('gen-btn-spinner-' + slotId).classList.remove('hidden');
+    document.getElementById('gen-progress-' + slotId).classList.remove('hidden');
+    document.getElementById('gen-result-' + slotId).classList.add('hidden');
+
+    // Submit generation request
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+
+    fetch('/api/image-generate/' + patternId + '/' + slotId, {
+      method: 'POST',
+      body: formData,
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.job_id) {
+        pollImageGeneration(data.job_id, patternId, slotId);
+      } else {
+        resetGenerationUI(slotId);
+        showToast(data.detail || '生成に失敗しました', 'error');
+      }
+    })
+    .catch(err => {
+      resetGenerationUI(slotId);
+      showToast('生成リクエストに失敗しました', 'error');
+    });
+  }
+
+  function pollImageGeneration(jobId, patternId, slotId) {
+    const evtSource = new EventSource('/api/image-generate/status/' + jobId);
+
+    evtSource.onmessage = function(event) {
+      const data = JSON.parse(event.data);
+
+      // Update progress
+      const progress = data.progress || 0;
+      document.getElementById('gen-progress-bar-' + slotId).style.width = progress + '%';
+      document.getElementById('gen-progress-text-' + slotId).textContent = progress + '%';
+
+      if (data.status === 'completed') {
+        evtSource.close();
+        document.getElementById('gen-progress-' + slotId).classList.add('hidden');
+        resetGenerationUI(slotId);
+
+        if (data.image_url) {
+          // Show result
+          document.getElementById('gen-result-img-' + slotId).src = data.image_url;
+          document.getElementById('gen-result-img-' + slotId).dataset.imageUrl = data.image_url;
+          document.getElementById('gen-result-' + slotId).classList.remove('hidden');
+          showToast('画像が生成されました', 'success');
+        }
+      } else if (data.status === 'failed') {
+        evtSource.close();
+        resetGenerationUI(slotId);
+        document.getElementById('gen-progress-' + slotId).classList.add('hidden');
+        showToast(data.error || '生成に失敗しました', 'error');
+      }
+    };
+
+    evtSource.onerror = function() {
+      evtSource.close();
+      resetGenerationUI(slotId);
+      document.getElementById('gen-progress-' + slotId).classList.add('hidden');
+    };
+  }
+
+  function resetGenerationUI(slotId) {
+    document.getElementById('gen-btn-text-' + slotId).classList.remove('hidden');
+    document.getElementById('gen-btn-spinner-' + slotId).classList.add('hidden');
+  }
+
+  function applyGeneratedImage(patternId, slotId) {
+    const imageUrl = document.getElementById('gen-result-img-' + slotId).dataset.imageUrl;
+    const prompt = document.getElementById('prompt-' + slotId).value.trim();
+
+    const formData = new FormData();
+    formData.append('image_url', imageUrl);
+    formData.append('prompt', prompt);
+
+    fetch('/api/image-generate/apply/' + patternId + '/' + slotId, {
+      method: 'POST',
+      body: formData,
+    })
+    .then(response => response.text())
+    .then(html => {
+      const previewCanvas = document.getElementById('preview-canvas');
+      if (previewCanvas) {
+        previewCanvas.outerHTML = html;
+      }
+      showToast('画像を適用しました', 'success');
+    })
+    .catch(err => {
+      showToast('画像の適用に失敗しました', 'error');
+    });
   }
 </script>

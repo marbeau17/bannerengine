@@ -1,4 +1,4 @@
-"""Nano Banana Pro client using Google GenAI SDK (nano-banana-pro-preview model)."""
+"""NanoBannaraPro2 client using Google GenAI SDK (nano-bannara-pro-2 model)."""
 
 from __future__ import annotations
 
@@ -11,14 +11,14 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_MODEL_NAME = "models/nano-banana-pro-preview"
+_MODEL_NAME = "models/nano-bannara-pro-2"
 
 
 class NanoBananaClient:
-    """Client for Nano Banana Pro image generation via Google GenAI.
+    """Client for NanoBannaraPro2 image generation via Google GenAI.
 
     Uses the ``google.generativeai`` (genai) SDK with the
-    ``nano-banana-pro-preview`` model to generate banner images from
+    ``nano-bannara-pro-2`` model to generate banner images from
     render instructions.
     """
 
@@ -36,23 +36,26 @@ class NanoBananaClient:
             self._model = genai.GenerativeModel(_MODEL_NAME)
         return self._model
 
-    async def submit_render(self, instruction: dict) -> str:
+    async def submit_render(
+        self, instruction: dict, user_prompt: str | None = None
+    ) -> str:
         """Submit a render instruction and return a job_id.
 
         The render instruction is converted to a prompt for the
-        nano-banana-pro-preview model. Generation runs asynchronously.
+        nano-bannara-pro-2 model. Generation runs asynchronously.
         """
         job_id = str(uuid.uuid4())
         self._jobs[job_id] = {
             "status": "queued",
             "progress": 0,
             "instruction": instruction,
+            "user_prompt": user_prompt,
             "result": None,
             "error": None,
         }
 
         # Launch generation in background
-        asyncio.create_task(self._generate(job_id, instruction))
+        asyncio.create_task(self._generate(job_id, instruction, user_prompt))
 
         return job_id
 
@@ -74,7 +77,9 @@ class NanoBananaClient:
             return b""
         return job["result"]
 
-    async def _generate(self, job_id: str, instruction: dict) -> None:
+    async def _generate(
+        self, job_id: str, instruction: dict, user_prompt: str | None = None
+    ) -> None:
         """Run the actual generation via GenAI."""
         job = self._jobs[job_id]
         try:
@@ -84,7 +89,7 @@ class NanoBananaClient:
             model = self._get_model()
 
             # Build the generation prompt from the render instruction
-            prompt = self._build_prompt(instruction)
+            prompt = self._build_prompt(instruction, user_prompt=user_prompt)
 
             job["progress"] = 30
 
@@ -116,16 +121,23 @@ class NanoBananaClient:
             job["progress"] = 0
 
     @staticmethod
-    def _build_prompt(instruction: dict) -> str:
+    def _build_prompt(
+        instruction: dict, *, user_prompt: str | None = None
+    ) -> str:
         """Convert a render instruction dict into a text prompt."""
         canvas = instruction.get("canvas", {})
         layers = instruction.get("layers", [])
 
-        parts = [
+        parts = []
+
+        if user_prompt:
+            parts.append(f"User creative direction: {user_prompt}")
+
+        parts.extend([
             f"Generate a banner image with dimensions {canvas.get('width', 1200)}x{canvas.get('height', 630)} pixels.",
             f"Background color: {canvas.get('background_color', '#FFFFFF')}.",
             f"Output format: {canvas.get('format', 'png')}.",
-        ]
+        ])
 
         for layer in layers:
             layer_type = layer.get("type", "")
@@ -144,6 +156,25 @@ class NanoBananaClient:
                 )
 
         return "\n".join(parts)
+
+    async def generate_image_from_prompt(
+        self, prompt: str, width: int = 1024, height: int = 1024
+    ) -> str:
+        """Generate an image from a plain text prompt.
+
+        Creates a simplified render instruction with the given canvas
+        dimensions and delegates to :meth:`submit_render`.
+
+        Returns the job_id for status polling / result retrieval.
+        """
+        instruction = {
+            "canvas": {
+                "width": width,
+                "height": height,
+            },
+        }
+        job_id = await self.submit_render(instruction, user_prompt=prompt)
+        return job_id
 
     async def close(self) -> None:
         """Clean up resources."""

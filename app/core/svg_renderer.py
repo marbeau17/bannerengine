@@ -64,7 +64,15 @@ class SvgRenderer:
 
     def _render_slot(self, svg: ET.Element, slot: Slot, value: Any, template: BannerTemplate) -> None:
         w, h = template.meta.width, template.meta.height
+
         normalised = self._normalise_value(slot, value)
+
+        # Check for AI prompt with no image yet (prompt pending generation)
+        # Only show prompt placeholder if there's a prompt but no usable image/value
+        prompt_text = self._extract_prompt(value)
+        if prompt_text and not self._has_image_url(value) and (normalised is None or normalised == ""):
+            self._render_prompt_placeholder(svg, slot, prompt_text, w, h)
+            return
 
         if normalised is None or normalised == "":
             self._render_placeholder(svg, slot, w, h)
@@ -92,7 +100,7 @@ class SvgRenderer:
             if slot.type in (SlotType.TEXT, SlotType.IMAGE_OR_TEXT):
                 return value.get("text", value.get("label", value.get("value", "")))
             if slot.type == SlotType.IMAGE:
-                return value.get("image_url", "")
+                return value.get("source_url", value.get("image_url", ""))
             if slot.type == SlotType.BUTTON:
                 return value
             return str(value)
@@ -185,6 +193,76 @@ class SvgRenderer:
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
             "font-family": "Arial, Helvetica, sans-serif",
             "font-size": "12", "fill": "#999999",
+            "text-anchor": "middle", "dominant-baseline": "central",
+        })
+        text_elem.text = label
+
+    @staticmethod
+    def _extract_prompt(value: Any) -> str | None:
+        """Return the prompt string from a slot value, or None."""
+        if isinstance(value, dict):
+            prompt = value.get("prompt", "")
+            if prompt and str(prompt).strip():
+                return str(prompt).strip()
+        if hasattr(value, "prompt"):
+            prompt = getattr(value, "prompt", "")
+            if prompt and str(prompt).strip():
+                return str(prompt).strip()
+        return None
+
+    @staticmethod
+    def _has_image_url(value: Any) -> bool:
+        """Return True if the value contains a non-empty image/source URL."""
+        if isinstance(value, dict):
+            for key in ("source_url", "image_url", "url", "href"):
+                url = value.get(key, "")
+                if url and str(url).strip():
+                    return True
+            return False
+        for attr in ("source_url", "image_url", "url"):
+            if hasattr(value, attr):
+                url = getattr(value, attr, "")
+                if url and str(url).strip():
+                    return True
+        return False
+
+    def _render_prompt_placeholder(
+        self, svg: ET.Element, slot: Slot, prompt: str, w: int, h: int
+    ) -> None:
+        """Render a purple-tinted placeholder indicating an AI prompt is pending."""
+        x, y = self._calc_px(slot.x, w), self._calc_px(slot.y, h)
+        sw, sh = self._calc_px(slot.width, w), self._calc_px(slot.height, h)
+
+        # Purple/indigo dashed border rectangle
+        ET.SubElement(svg, "rect", attrib={
+            "x": f"{x:.1f}", "y": f"{y:.1f}",
+            "width": f"{sw:.1f}", "height": f"{sh:.1f}",
+            "fill": "#f0ebff", "fill-opacity": "0.5",
+            "stroke": "#6c5ce7", "stroke-width": "1.5",
+            "stroke-dasharray": "6,4", "rx": "4", "ry": "4",
+        })
+
+        # Sparkle / magic icon (small star shape) near the top-left
+        icon_size = min(sw, sh, 20)
+        icon_x = x + 8
+        icon_y = y + 8 + icon_size / 2
+        sparkle = ET.SubElement(svg, "text", attrib={
+            "x": f"{icon_x:.1f}", "y": f"{icon_y:.1f}",
+            "font-family": "Arial, Helvetica, sans-serif",
+            "font-size": f"{icon_size:.0f}",
+            "fill": "#6c5ce7",
+            "text-anchor": "start", "dominant-baseline": "central",
+        })
+        sparkle.text = "\u2728"  # sparkles unicode character
+
+        # Truncate prompt to 30 characters
+        display_prompt = prompt[:30] + "..." if len(prompt) > 30 else prompt
+        label = f"AI: {display_prompt}"
+
+        text_elem = ET.SubElement(svg, "text", attrib={
+            "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
+            "font-family": "Arial, Helvetica, sans-serif",
+            "font-size": "11", "fill": "#6c5ce7",
             "text-anchor": "middle", "dominant-baseline": "central",
         })
         text_elem.text = label

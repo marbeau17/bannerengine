@@ -180,6 +180,8 @@ class BannerService:
                 "source_url": value.get("source_url", ""),
                 "fit": value.get("fit", "cover"),
                 "opacity": value.get("opacity", 1.0),
+                "prompt": value.get("prompt", ""),
+                "generation_model": value.get("generation_model", "nano-bannara-pro-2"),
             }
         ]
 
