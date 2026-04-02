@@ -1,8 +1,8 @@
 {% if status == 'processing' %}
 <div
   class="space-y-2"
-  hx-get="/api/generate/{{ job_id }}/status"
-  hx-trigger="every 2s"
+  hx-get="/api/generate/progress/{{ job_id }}"
+  hx-trigger="every 1s"
   hx-target="#generate-result"
   hx-swap="innerHTML"
 >

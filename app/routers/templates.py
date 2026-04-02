@@ -46,9 +46,9 @@ async def list_templates(
         ]
 
     return templates.TemplateResponse(
+        request,
         "partials/template_grid.html",
         {
-            "request": request,
             "templates": all_templates,
         },
     )
@@ -61,9 +61,9 @@ async def list_categories(request: Request):
     categories = template_service.get_categories()
 
     return templates.TemplateResponse(
+        request,
         "partials/category_list.html",
         {
-            "request": request,
             "categories": categories,
         },
     )
@@ -77,9 +77,9 @@ async def get_template_detail(request: Request, pattern_id: str):
 
 
     return templates.TemplateResponse(
+        request,
         "partials/template_detail.html",
         {
-            "request": request,
             "template": template,
             "pattern_id": pattern_id,
         },
@@ -96,9 +96,9 @@ async def get_slot_editors(request: Request, pattern_id: str):
     slot_values = request.session.get(f"slots_{pattern_id}", {})
 
     return templates.TemplateResponse(
+        request,
         "partials/slot_editor.html",
         {
-            "request": request,
             "template": template,
             "pattern_id": pattern_id,
             "slots": template.slots,

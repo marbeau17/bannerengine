@@ -213,7 +213,7 @@ class TestPreviewNotFound:
 # ---------------------------------------------------------------------------
 
 class TestGenerateAccepted:
-    async def test_generate_returns_202(self, client_with_template: AsyncClient):
+    async def test_generate_returns_html(self, client_with_template: AsyncClient):
         # First fill in all required slots via the session-aware PATCH
         await client_with_template.patch(
             "/api/slots/car_01/headline",
@@ -229,10 +229,9 @@ class TestGenerateAccepted:
         )
 
         resp = await client_with_template.post("/api/generate/car_01")
-        assert resp.status_code == 202
-        data = resp.json()
-        assert "job_id" in data
-        assert data["status"] == "queued"
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers.get("content-type", "")
+        assert "生成中" in resp.text
 
 
 # ---------------------------------------------------------------------------
@@ -251,6 +250,8 @@ class TestGenerateNotFound:
 
 class TestGenerateMissingSlots:
     async def test_generate_missing_required_slots(self, client_with_template: AsyncClient):
-        # Don't fill in any slots -- all required slots are missing.
+        # Don't fill in any slots -- returns HTML error partial.
         resp = await client_with_template.post("/api/generate/car_01")
-        assert resp.status_code == 422
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers.get("content-type", "")
+        assert "未入力" in resp.text or "エラー" in resp.text

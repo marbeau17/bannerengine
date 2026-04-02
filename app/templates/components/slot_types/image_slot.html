@@ -1,12 +1,20 @@
 <div class="space-y-2">
+  <!-- Hidden file input (outside dropzone to prevent click bubbling) -->
+  <input
+    type="file"
+    id="file-input-{{ current_slot.id }}"
+    accept="image/png,image/jpeg,image/webp"
+    class="hidden"
+    onchange="uploadSlotImage(this.files[0], '{{ pattern_id }}', '{{ current_slot.id }}')"
+  >
   <!-- Drag-and-drop upload area -->
   <div
     id="dropzone-{{ current_slot.id }}"
     class="relative border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-indigo-400 transition-colors cursor-pointer"
     ondragover="event.preventDefault(); this.classList.add('border-indigo-400', 'bg-indigo-50')"
     ondragleave="this.classList.remove('border-indigo-400', 'bg-indigo-50')"
-    ondrop="event.preventDefault(); this.classList.remove('border-indigo-400', 'bg-indigo-50'); handleFileDrop(event, '{{ current_slot.id }}')"
-    onclick="this.querySelector('input[type=file]').click()"
+    ondrop="event.preventDefault(); this.classList.remove('border-indigo-400', 'bg-indigo-50'); uploadSlotImage(event.dataTransfer.files[0], '{{ pattern_id }}', '{{ current_slot.id }}')"
+    onclick="document.getElementById('file-input-{{ current_slot.id }}').click()"
   >
     {% if current_value is mapping and current_value.get('source_url') %}
     <!-- Preview thumbnail -->
@@ -19,28 +27,11 @@
     {% else %}
     <svg class="mx-auto w-8 h-8 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
     </svg>
     <p class="text-xs text-gray-500 font-medium">画像をドラッグ&ドロップ</p>
     <p class="text-[11px] text-gray-400 mt-0.5">またはクリックして選択</p>
     {% endif %}
-
-    <form
-      id="upload-form-{{ current_slot.id }}"
-      hx-post="/api/assets/upload"
-      hx-encoding="multipart/form-data"
-      hx-target="#preview-canvas"
-      class="hidden"
-    >
-      <input type="hidden" name="slot_id" value="{{ current_slot.id }}">
-      <input type="hidden" name="pattern_id" value="{{ pattern_id }}">
-      <input
-        type="file"
-        name="file"
-        accept="image/*"
-        onchange="htmx.trigger(this.closest('form'), 'submit')"
-      >
-    </form>
   </div>
 
   {% if current_slot.format_hint %}
@@ -112,62 +103,83 @@
 </div>
 
 <script>
-  function handleFileDrop(event, slotId) {
-    const form = document.getElementById('upload-form-' + slotId);
-    const fileInput = form.querySelector('input[type=file]');
-    fileInput.files = event.dataTransfer.files;
-    htmx.trigger(form, 'submit');
+  function uploadSlotImage(file, patternId, slotId) {
+    if (!file) { console.error('uploadSlotImage: no file selected'); return; }
+    console.log('uploadSlotImage:', file.name, file.size, file.type, 'slot:', slotId);
+
+    var formData = new FormData();
+    formData.append('file', file, file.name);
+    formData.append('slot_id', slotId);
+    formData.append('pattern_id', patternId);
+
+    fetch('/api/assets/upload', {
+      method: 'POST',
+      body: formData,
+    })
+    .then(function(response) {
+      if (!response.ok) {
+        return response.text().then(function(t) {
+          console.error('Upload error response:', response.status, t);
+          throw new Error('Upload failed: ' + response.status + ' ' + t);
+        });
+      }
+      return response.text();
+    })
+    .then(function(html) {
+      var canvas = document.getElementById('preview-canvas');
+      if (canvas) canvas.outerHTML = html;
+      BannerToast.show('success', '画像をアップロードしました');
+    })
+    .catch(function(err) {
+      BannerToast.show('error', 'アップロードに失敗しました');
+    });
   }
 
   function toggleAiGeneration(slotId) {
-    const panel = document.getElementById('ai-gen-' + slotId);
+    var panel = document.getElementById('ai-gen-' + slotId);
     panel.classList.toggle('hidden');
   }
 
   function startImageGeneration(patternId, slotId) {
-    const prompt = document.getElementById('prompt-' + slotId).value.trim();
+    var prompt = document.getElementById('prompt-' + slotId).value.trim();
     if (!prompt) {
-      showToast('プロンプトを入力してください', 'warning');
+      BannerToast.show('warning', 'プロンプトを入力してください');
       return;
     }
 
-    // Show loading state
     document.getElementById('gen-btn-text-' + slotId).classList.add('hidden');
     document.getElementById('gen-btn-spinner-' + slotId).classList.remove('hidden');
     document.getElementById('gen-progress-' + slotId).classList.remove('hidden');
     document.getElementById('gen-result-' + slotId).classList.add('hidden');
 
-    // Submit generation request
-    const formData = new FormData();
+    var formData = new FormData();
     formData.append('prompt', prompt);
 
     fetch('/api/image-generate/' + patternId + '/' + slotId, {
       method: 'POST',
       body: formData,
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
       if (data.job_id) {
         pollImageGeneration(data.job_id, patternId, slotId);
       } else {
         resetGenerationUI(slotId);
-        showToast(data.detail || '生成に失敗しました', 'error');
+        BannerToast.show('error', data.detail || '生成に失敗しました');
       }
     })
-    .catch(err => {
+    .catch(function(err) {
       resetGenerationUI(slotId);
-      showToast('生成リクエストに失敗しました', 'error');
+      BannerToast.show('error', '生成リクエストに失敗しました');
     });
   }
 
   function pollImageGeneration(jobId, patternId, slotId) {
-    const evtSource = new EventSource('/api/image-generate/status/' + jobId);
+    var evtSource = new EventSource('/api/image-generate/status/' + jobId);
 
     evtSource.onmessage = function(event) {
-      const data = JSON.parse(event.data);
-
-      // Update progress
-      const progress = data.progress || 0;
+      var data = JSON.parse(event.data);
+      var progress = data.progress || 0;
       document.getElementById('gen-progress-bar-' + slotId).style.width = progress + '%';
       document.getElementById('gen-progress-text-' + slotId).textContent = progress + '%';
 
@@ -175,19 +187,17 @@
         evtSource.close();
         document.getElementById('gen-progress-' + slotId).classList.add('hidden');
         resetGenerationUI(slotId);
-
         if (data.image_url) {
-          // Show result
           document.getElementById('gen-result-img-' + slotId).src = data.image_url;
           document.getElementById('gen-result-img-' + slotId).dataset.imageUrl = data.image_url;
           document.getElementById('gen-result-' + slotId).classList.remove('hidden');
-          showToast('画像が生成されました', 'success');
+          BannerToast.show('success', '画像が生成されました');
         }
       } else if (data.status === 'failed') {
         evtSource.close();
         resetGenerationUI(slotId);
         document.getElementById('gen-progress-' + slotId).classList.add('hidden');
-        showToast(data.error || '生成に失敗しました', 'error');
+        BannerToast.show('error', data.error || '生成に失敗しました');
       }
     };
 
@@ -204,10 +214,10 @@
   }
 
   function applyGeneratedImage(patternId, slotId) {
-    const imageUrl = document.getElementById('gen-result-img-' + slotId).dataset.imageUrl;
-    const prompt = document.getElementById('prompt-' + slotId).value.trim();
+    var imageUrl = document.getElementById('gen-result-img-' + slotId).dataset.imageUrl;
+    var prompt = document.getElementById('prompt-' + slotId).value.trim();
 
-    const formData = new FormData();
+    var formData = new FormData();
     formData.append('image_url', imageUrl);
     formData.append('prompt', prompt);
 
@@ -215,16 +225,14 @@
       method: 'POST',
       body: formData,
     })
-    .then(response => response.text())
-    .then(html => {
-      const previewCanvas = document.getElementById('preview-canvas');
-      if (previewCanvas) {
-        previewCanvas.outerHTML = html;
-      }
-      showToast('画像を適用しました', 'success');
+    .then(function(response) { return response.text(); })
+    .then(function(html) {
+      var canvas = document.getElementById('preview-canvas');
+      if (canvas) canvas.outerHTML = html;
+      BannerToast.show('success', '画像を適用しました');
     })
-    .catch(err => {
-      showToast('画像の適用に失敗しました', 'error');
+    .catch(function(err) {
+      BannerToast.show('error', '画像の適用に失敗しました');
     });
   }
 </script>

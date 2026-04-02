@@ -88,7 +88,7 @@ class PreviewService:
 
         Raises ``TemplateNotFoundError`` when not found.
         """
-        template = await self._template_service.get_template(pattern_id)
+        template = self._template_service.get_template(pattern_id)
         if template is None:
             raise TemplateNotFoundError(pattern_id)
         return template

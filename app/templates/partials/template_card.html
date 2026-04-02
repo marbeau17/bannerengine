@@ -1,8 +1,6 @@
-<div
-  class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:scale-[1.02] hover:shadow-md transition-all duration-200"
-  hx-get="/editor/{{ template.meta.pattern_id }}"
-  hx-push-url="true"
-  hx-target="body"
+<a
+  href="/editor/{{ template.meta.pattern_id }}"
+  class="block bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:scale-[1.02] hover:shadow-md transition-all duration-200"
 >
   <!-- Thumbnail -->
   <div class="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
@@ -37,4 +35,4 @@
     <p class="mt-1 text-xs text-gray-400 truncate">{{ template.meta.recommended_use }}</p>
     {% endif %}
   </div>
-</div>
+</a>

@@ -109,9 +109,9 @@ async def update_slot(request: Request, pattern_id: str, slot_id: str):
     svg_markup = svg_renderer.render(template, session_slots)
 
     return templates.TemplateResponse(
+        request,
         "partials/preview_canvas.html",
         {
-            "request": request,
             "template": template,
             "pattern_id": pattern_id,
             "svg_markup": svg_markup,

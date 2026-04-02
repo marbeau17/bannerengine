@@ -97,6 +97,8 @@ class SvgRenderer:
         if isinstance(value, str):
             return value
         if isinstance(value, dict):
+            if slot.type == SlotType.IMAGE_OR_TEXT and value.get("slot_type") == "image":
+                return value.get("source_url", value.get("image_url", ""))
             if slot.type in (SlotType.TEXT, SlotType.IMAGE_OR_TEXT):
                 return value.get("text", value.get("label", value.get("value", "")))
             if slot.type == SlotType.IMAGE:
@@ -120,7 +122,7 @@ class SvgRenderer:
 
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
-            "font-family": "Arial, Helvetica, sans-serif",
+            "font-family": "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif",
             "font-size": font_size_num,
             "font-weight": slot.font_weight or "normal",
             "fill": slot.color or "#000000",
@@ -173,7 +175,7 @@ class SvgRenderer:
 
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
-            "font-family": "Arial, Helvetica, sans-serif",
+            "font-family": "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif",
             "font-size": font_size_num, "font-weight": "bold",
             "fill": text_color, "text-anchor": "middle", "dominant-baseline": "central",
         })
@@ -191,7 +193,7 @@ class SvgRenderer:
         label = slot.description or f"{slot.type.value}: {slot.id}"
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
-            "font-family": "Arial, Helvetica, sans-serif",
+            "font-family": "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif",
             "font-size": "12", "fill": "#999999",
             "text-anchor": "middle", "dominant-baseline": "central",
         })
@@ -248,7 +250,7 @@ class SvgRenderer:
         icon_y = y + 8 + icon_size / 2
         sparkle = ET.SubElement(svg, "text", attrib={
             "x": f"{icon_x:.1f}", "y": f"{icon_y:.1f}",
-            "font-family": "Arial, Helvetica, sans-serif",
+            "font-family": "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif",
             "font-size": f"{icon_size:.0f}",
             "fill": "#6c5ce7",
             "text-anchor": "start", "dominant-baseline": "central",
@@ -261,7 +263,7 @@ class SvgRenderer:
 
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
-            "font-family": "Arial, Helvetica, sans-serif",
+            "font-family": "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif",
             "font-size": "11", "fill": "#6c5ce7",
             "text-anchor": "middle", "dominant-baseline": "central",
         })

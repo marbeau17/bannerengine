@@ -13,10 +13,10 @@ class TestNanoBananaClientV2:
     def client(self):
         return NanoBananaClient(api_key="test-key")
 
-    def test_model_name_is_v2(self):
-        """Model name should be nano-bannara-pro-2."""
+    def test_model_name_is_nano_banana_pro(self):
+        """Model name should be gemini-3-pro-image-preview (Nano Banana Pro)."""
         from app.services.nano_banana_client import _MODEL_NAME
-        assert "nano-bannara-pro-2" in _MODEL_NAME
+        assert "gemini-3-pro-image-preview" in _MODEL_NAME
 
     def test_build_prompt_without_user_prompt(self, client):
         """_build_prompt without user_prompt should work as before."""

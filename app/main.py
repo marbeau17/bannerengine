@@ -6,6 +6,9 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.exceptions import (
+    AssetUploadError,
     GenerationError,
     TemplateNotFoundError,
     ValidationError,
@@ -160,6 +164,10 @@ app.add_middleware(
 app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET_KEY,
+    max_age=14 * 24 * 60 * 60,  # 14 days
+    session_cookie="banner_session",
+    same_site="lax",
+    https_only=False,
 )
 
 # ---------------------------------------------------------------------------
@@ -188,6 +196,12 @@ async def health_check():
     return {"status": "ok", "version": "1.0.0"}
 
 
+@app.get("/debug/session", tags=["debug"])
+async def debug_session(request: Request):
+    """Show current session contents for debugging."""
+    return JSONResponse(content=dict(request.session))
+
+
 # ---------------------------------------------------------------------------
 # Exception handlers
 # ---------------------------------------------------------------------------
@@ -205,9 +219,15 @@ async def not_found_handler(request: Request, exc):
 @app.exception_handler(422)
 async def validation_error_handler(request: Request, exc):
     """Handle 422 Unprocessable Entity errors."""
+    detail = "Validation error. Please check your input."
+    if hasattr(exc, "errors"):
+        detail = str(exc.errors()) if callable(exc.errors) else str(exc.errors)
+    elif hasattr(exc, "detail"):
+        detail = str(exc.detail)
+    logger.warning("422 error on %s: %s", request.url.path, detail)
     return JSONResponse(
         status_code=422,
-        content={"detail": "Validation error. Please check your input."},
+        content={"detail": detail},
     )
 
 
@@ -253,5 +273,14 @@ async def generation_error_handler(request: Request, exc: GenerationError):
     """Handle GenerationError."""
     return JSONResponse(
         status_code=500,
+        content={"detail": exc.message},
+    )
+
+
+@app.exception_handler(AssetUploadError)
+async def asset_upload_error_handler(request: Request, exc: AssetUploadError):
+    """Handle AssetUploadError."""
+    return JSONResponse(
+        status_code=422,
         content={"detail": exc.message},
     )

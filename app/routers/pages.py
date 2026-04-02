@@ -25,9 +25,9 @@ async def home(request: Request):
     all_templates = template_service.list_templates()
 
     return templates.TemplateResponse(
+        request,
         "pages/index.html",
         {
-            "request": request,
             "categories": categories,
             "templates": all_templates,
         },
@@ -48,9 +48,9 @@ async def editor(request: Request, pattern_id: str):
     slot_values = request.session.get(f"slots_{pattern_id}", {})
 
     return templates.TemplateResponse(
+        request,
         "pages/editor.html",
         {
-            "request": request,
             "template": template,
             "pattern_id": pattern_id,
             "slots": template.slots,

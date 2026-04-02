@@ -11,7 +11,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_MODEL_NAME = "models/nano-bannara-pro-2"
+_MODEL_NAME = "gemini-3-pro-image-preview"
 
 
 class NanoBananaClient:
