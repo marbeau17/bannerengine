@@ -645,7 +645,8 @@ async def export_psd(request: Request, pattern_id: str):
             ty = (px_h - th) / 2
             draw.text((tx, ty), text, fill=color_rgba, font=font)
 
-            PixelLayer.frompil(text_img, psd, name=f"Text: {slot.id}", top=px_y, left=px_x)
+            layer_name = f"Text: {slot.id} [{fs}px {fw} {color}]: {text[:30]}"
+            PixelLayer.frompil(text_img, psd, name=layer_name, top=px_y, left=px_x)
 
         elif slot.type.value == "image":
             # Load the image file
@@ -665,7 +666,7 @@ async def export_psd(request: Request, pattern_id: str):
                 cx = (scaled.width - px_w) // 2
                 cy = (scaled.height - px_h) // 2
                 cropped = scaled.crop((cx, cy, cx + px_w, cy + px_h))
-                PixelLayer.frompil(cropped, psd, name=f"Image: {slot.id}", top=px_y, left=px_x)
+                PixelLayer.frompil(cropped, psd, name=f"Image: {slot.id} [{px_w}x{px_h}px]", top=px_y, left=px_x)
             except Exception:
                 continue
 
@@ -684,7 +685,7 @@ async def export_psd(request: Request, pattern_id: str):
 
             # Button background layer
             btn_bg = Image.new("RGBA", (px_w, px_h), _hex_to_rgba(bg))
-            PixelLayer.frompil(btn_bg, psd, name=f"Button BG: {slot.id}", top=px_y, left=px_x)
+            PixelLayer.frompil(btn_bg, psd, name=f"Button BG: {slot.id} [{bg}]", top=px_y, left=px_x)
 
             # Button text layer
             fs_str = (val.get("font_size") if isinstance(val, dict) else None) or slot.font_size_guideline or "14"
@@ -695,7 +696,8 @@ async def export_psd(request: Request, pattern_id: str):
             bbox = draw.textbbox((0, 0), label or "Button", font=font)
             tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
             draw.text(((px_w - tw) / 2, (px_h - th) / 2), label or "Button", fill=_hex_to_rgba(tc), font=font)
-            PixelLayer.frompil(btn_text, psd, name=f"Button Text: {slot.id}", top=px_y, left=px_x)
+            btn_layer_name = f"Button Text: {slot.id} [{fs}px bold {tc}]: {(label or 'Button')[:30]}"
+            PixelLayer.frompil(btn_text, psd, name=btn_layer_name, top=px_y, left=px_x)
 
     buf = io.BytesIO()
     psd.save(buf)
@@ -718,6 +720,33 @@ def _hex_to_rgba(hex_color: str) -> tuple[int, int, int, int]:
     if len(h) == 8:
         return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), int(h[6:8], 16))
     return (255, 255, 255, 255)
+
+
+@router.get("/svg/{pattern_id}")
+async def export_svg(request: Request, pattern_id: str):
+    """Export the current banner as an SVG file with editable text."""
+    from fastapi.responses import Response
+
+    template_service = request.app.state.template_service
+    svg_renderer = request.app.state.svg_renderer
+    template = template_service.get_template(pattern_id)
+    slot_values = request.session.get(f"slots_{pattern_id}", {})
+
+    # Apply design overrides
+    design_overrides = slot_values.get("_design")
+    if isinstance(design_overrides, dict) and design_overrides.get("background_value"):
+        template = template.model_copy(deep=True)
+        template.design.background_value = design_overrides["background_value"]
+
+    svg_string = svg_renderer.render(template, slot_values)
+    # Embed local images so SVG is self-contained
+    svg_string = _embed_local_images(svg_string)
+
+    return Response(
+        content=svg_string.encode("utf-8"),
+        media_type="image/svg+xml",
+        headers={"Content-Disposition": f'attachment; filename="{pattern_id}.svg"'},
+    )
 
 
 @router.get("/progress/{job_id}", response_class=HTMLResponse)
