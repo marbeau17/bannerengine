@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from starlette.middleware.sessions import SessionMiddleware
+from app.session import ServerSessionMiddleware
 
 from app.core.exceptions import (
     AssetUploadError,
@@ -161,14 +161,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=SESSION_SECRET_KEY,
-    max_age=14 * 24 * 60 * 60,  # 14 days
-    session_cookie="banner_session",
-    same_site="lax",
-    https_only=False,
-)
+app.add_middleware(ServerSessionMiddleware)
 
 # ---------------------------------------------------------------------------
 # Static files & templates
@@ -195,11 +188,6 @@ async def health_check():
     """Health check endpoint."""
     return {"status": "ok", "version": "1.0.0"}
 
-
-@app.get("/debug/session", tags=["debug"])
-async def debug_session(request: Request):
-    """Show current session contents for debugging."""
-    return JSONResponse(content=dict(request.session))
 
 
 # ---------------------------------------------------------------------------

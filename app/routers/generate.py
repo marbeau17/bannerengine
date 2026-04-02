@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import io
 import logging
+import mimetypes
 import os
+import re
 import uuid
+import xml.etree.ElementTree as ET
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -22,9 +26,20 @@ templates = Jinja2Templates(directory="app/templates")
 
 # In-memory job store for the MVP. Maps job_id -> job state dict.
 _jobs: dict[str, dict] = {}
+_MAX_JOBS = 200
 
 OUTPUT_DIR = os.path.join("static", "generated")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+def _evict_old_jobs() -> None:
+    """Remove oldest completed/failed jobs when the store exceeds _MAX_JOBS."""
+    if len(_jobs) <= _MAX_JOBS:
+        return
+    # Sort by completion: remove completed/failed first
+    removable = [jid for jid, j in _jobs.items() if j["status"] in ("completed", "failed")]
+    for jid in removable[:len(_jobs) - _MAX_JOBS]:
+        _jobs.pop(jid, None)
 
 
 @router.post("/{pattern_id}", response_class=HTMLResponse)
@@ -58,7 +73,8 @@ async def start_generation(request: Request, pattern_id: str):
             },
         )
 
-    # Create a job entry
+    # Create a job entry (evict old ones if needed)
+    _evict_old_jobs()
     job_id = str(uuid.uuid4())
     _jobs[job_id] = {
         "job_id": job_id,
@@ -116,9 +132,6 @@ async def _render_banner(job_id: str, svg_string: str, width: int, height: int) 
 
 def _embed_local_images(svg_string: str) -> str:
     """Replace local /static/ image hrefs with inline base64 data URIs."""
-    import base64
-    import mimetypes
-    import re
 
     def _replace_href(match: re.Match) -> str:
         path = match.group(1)
@@ -155,6 +168,81 @@ def _svg_to_png(svg_string: str, width: int, height: int) -> bytes:
     return _pillow_svg_render(svg_string, width, height)
 
 
+__SVG_NS = "http://www.w3.org/2000/svg"
+__XLINK_NS = "http://www.w3.org/1999/xlink"
+
+# Font search paths (macOS, Linux)
+_FONT_PATHS = [
+    "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+]
+_BOLD_FONT_PATHS = [
+    "/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+]
+_font_cache: dict[tuple, object] = {}
+
+_NAMED_COLORS: dict[str, tuple[int, int, int, int]] = {
+    "white": (255, 255, 255, 255), "black": (0, 0, 0, 255),
+    "red": (255, 0, 0, 255), "blue": (0, 0, 255, 255),
+    "green": (0, 128, 0, 255), "none": (0, 0, 0, 0),
+}
+
+
+def _get_font(size: float, bold: bool = False):
+    """Get a font, using cache across renders."""
+    from PIL import ImageFont
+
+    key = (int(size), bold)
+    if key in _font_cache:
+        return _font_cache[key]
+    sz = max(int(size), 8)
+    for fp in (_BOLD_FONT_PATHS if bold else _FONT_PATHS) + _FONT_PATHS:
+        try:
+            font = ImageFont.truetype(fp, sz)
+            _font_cache[key] = font
+            return font
+        except (OSError, IOError):
+            continue
+    font = ImageFont.load_default()
+    _font_cache[key] = font
+    return font
+
+
+def _parse_color(color_str: str) -> tuple[int, int, int, int]:
+    """Parse CSS color to RGBA tuple."""
+    if not color_str:
+        return (0, 0, 0, 255)
+    color_str = color_str.strip()
+    if color_str.startswith("#"):
+        h = color_str.lstrip("#")
+        if len(h) == 3:
+            h = "".join(c * 2 for c in h)
+        if len(h) == 6:
+            return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), 255)
+        if len(h) == 8:
+            return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), int(h[6:8], 16))
+    return _NAMED_COLORS.get(color_str.lower(), (0, 0, 0, 255))
+
+
+def _pf(val: str | None, default: float = 0.0) -> float:
+    """Parse a float from an SVG attribute value."""
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
 def _pillow_svg_render(svg_string: str, width: int, height: int) -> bytes:
     """Pure-Python SVG to PNG renderer using Pillow.
 
@@ -162,89 +250,7 @@ def _pillow_svg_render(svg_string: str, width: int, height: int) -> bytes:
     Handles the subset of SVG that our SvgRenderer produces, including
     clip-path clipping and preserveAspectRatio="xMidYMid slice" for images.
     """
-    import base64
-    import xml.etree.ElementTree as ET
-
-    from PIL import Image, ImageDraw, ImageFont
-
-    SVG_NS = "http://www.w3.org/2000/svg"
-    XLINK_NS = "http://www.w3.org/1999/xlink"
-
-    img = Image.new("RGBA", (width, height), (255, 255, 255, 255))
-    draw = ImageDraw.Draw(img)
-
-    # Japanese-capable font search paths (macOS, Linux, Vercel)
-    _FONT_PATHS = [
-        "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
-        "/System/Library/Fonts/Hiragino Sans GB.ttc",
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
-        "/System/Library/Fonts/Helvetica.ttc",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ]
-    _BOLD_FONT_PATHS = [
-        "/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc",
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-        "/System/Library/Fonts/Helvetica.ttc",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    ]
-
-    _font_cache: dict[tuple, ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
-
-    def _get_font(size: float, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-        key = (int(size), bold)
-        if key in _font_cache:
-            return _font_cache[key]
-        sz = max(int(size), 8)
-        paths = _BOLD_FONT_PATHS if bold else _FONT_PATHS
-        for fp in paths:
-            try:
-                font = ImageFont.truetype(fp, sz)
-                _font_cache[key] = font
-                return font
-            except (OSError, IOError):
-                continue
-        # Try regular paths as fallback for bold
-        if bold:
-            for fp in _FONT_PATHS:
-                try:
-                    font = ImageFont.truetype(fp, sz)
-                    _font_cache[key] = font
-                    return font
-                except (OSError, IOError):
-                    continue
-        font = ImageFont.load_default()
-        _font_cache[key] = font
-        return font
-
-    def _parse_color(color_str: str) -> tuple[int, int, int, int]:
-        if not color_str:
-            return (0, 0, 0, 255)
-        color_str = color_str.strip()
-        if color_str.startswith("#"):
-            h = color_str.lstrip("#")
-            if len(h) == 3:
-                h = "".join(c * 2 for c in h)
-            if len(h) == 6:
-                return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), 255)
-            if len(h) == 8:
-                return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), int(h[6:8], 16))
-        named = {
-            "white": (255, 255, 255, 255), "black": (0, 0, 0, 255),
-            "red": (255, 0, 0, 255), "blue": (0, 0, 255, 255),
-            "green": (0, 128, 0, 255), "none": (0, 0, 0, 0),
-        }
-        return named.get(color_str.lower(), (0, 0, 0, 255))
-
-    def _pf(val: str | None, default: float = 0.0) -> float:
-        if val is None:
-            return default
-        try:
-            return float(val)
-        except (ValueError, TypeError):
-            return default
+    from PIL import Image, ImageDraw
 
     try:
         root = ET.fromstring(svg_string)
@@ -255,10 +261,10 @@ def _pillow_svg_render(svg_string: str, width: int, height: int) -> bytes:
 
     # Parse clip-path definitions from <defs>
     clip_rects: dict[str, tuple[float, float, float, float]] = {}
-    for defs in root.iter(f"{{{SVG_NS}}}defs"):
-        for cp in defs.iter(f"{{{SVG_NS}}}clipPath"):
+    for defs in root.iter(f"{{{_SVG_NS}}}defs"):
+        for cp in defs.iter(f"{{{_SVG_NS}}}clipPath"):
             cp_id = cp.get("id", "")
-            for rect in cp.iter(f"{{{SVG_NS}}}rect"):
+            for rect in cp.iter(f"{{{_SVG_NS}}}rect"):
                 cx = _pf(rect.get("x"))
                 cy = _pf(rect.get("y"))
                 cw = _pf(rect.get("width"))
@@ -267,7 +273,6 @@ def _pillow_svg_render(svg_string: str, width: int, height: int) -> bytes:
 
     # Process elements in document order (skip defs children)
     def _process_children(parent: ET.Element) -> None:
-        nonlocal draw
         for elem in parent:
             tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
 
@@ -350,7 +355,7 @@ def _pillow_svg_render(svg_string: str, width: int, height: int) -> bytes:
                 draw.text((tx, ty), text_content, fill=fill_color[:3], font=font)
 
             elif tag == "image":
-                href = elem.get("href") or elem.get(f"{{{XLINK_NS}}}href", "")
+                href = elem.get("href") or elem.get(f"{{{_XLINK_NS}}}href", "")
                 x = _pf(elem.get("x"))
                 y = _pf(elem.get("y"))
                 w = _pf(elem.get("width"))
@@ -414,8 +419,6 @@ def _pillow_svg_render(svg_string: str, width: int, height: int) -> bytes:
 
 def _load_image_bytes(href: str) -> bytes | None:
     """Load image bytes from a data URI, local path, or URL."""
-    import base64
-
     if href.startswith("data:"):
         _, b64data = href.split(",", 1)
         return base64.b64decode(b64data)

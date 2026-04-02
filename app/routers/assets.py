@@ -39,15 +39,17 @@ MIME_TO_EXT: dict[str, str] = {
 }
 
 
-def _validate_magic_bytes(header: bytes, content_type: str) -> bool:
-    """Check that the file header matches the expected magic bytes."""
-    expected = ALLOWED_TYPES.get(content_type)
-    if expected is None:
-        return False
-    # WebP files start with RIFF....WEBP - check the first 4 bytes
-    if content_type == "image/webp":
-        return header[:4] == expected and header[8:12] == b"WEBP"
-    return header[: len(expected)] == expected
+def _detect_mime_from_bytes(header: bytes) -> str | None:
+    """Detect image MIME type from file header magic bytes."""
+    if len(header) < 4:
+        return None
+    if header[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if header[:4] == b"\x89PNG":
+        return "image/png"
+    if header[:4] == b"RIFF" and len(header) >= 12 and header[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 @router.post("/upload")
@@ -77,54 +79,32 @@ async def upload_asset(request: Request):
     content_type_attr = getattr(file, "content_type", "") or ""
     filename_attr = getattr(file, "filename", "") or ""
 
-    # Determine MIME type — try declared, then extension, then magic bytes
-    content_type = content_type_attr
-    if content_type not in ALLOWED_TYPES:
-        ext_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
-        for ext, mime in ext_map.items():
-            if filename_attr.lower().endswith(ext):
-                content_type = mime
-                break
-    if content_type not in ALLOWED_TYPES and len(file_bytes) >= 12:
-        # Detect from magic bytes
-        if file_bytes[:3] == b"\xff\xd8\xff":
-            content_type = "image/jpeg"
-        elif file_bytes[:4] == b"\x89PNG":
-            content_type = "image/png"
-        elif file_bytes[:4] == b"RIFF" and file_bytes[8:12] == b"WEBP":
-            content_type = "image/webp"
-    if content_type not in ALLOWED_TYPES:
-        raise AssetUploadError(
-            f"Unsupported file type: {content_type or 'unknown'}. "
-            "Allowed types: JPEG, PNG, WebP."
-        )
-
     # Validate file size
     if len(file_bytes) > MAX_UPLOAD_SIZE:
         raise AssetUploadError(
             f"File too large ({len(file_bytes)} bytes). Maximum size is 10 MB."
         )
-
-    # Validate magic bytes
     if len(file_bytes) < 12:
         raise AssetUploadError("File is too small to be a valid image.")
 
-    if not _validate_magic_bytes(file_bytes, content_type):
-        # Try detecting actual type from bytes and use that instead
-        detected = None
-        if file_bytes[:3] == b"\xff\xd8\xff":
-            detected = "image/jpeg"
-        elif file_bytes[:4] == b"\x89PNG":
-            detected = "image/png"
-        elif file_bytes[:4] == b"RIFF" and len(file_bytes) > 11 and file_bytes[8:12] == b"WEBP":
-            detected = "image/webp"
-        if detected and detected in ALLOWED_TYPES:
-            content_type = detected
-        else:
-            raise AssetUploadError(
-                "Unsupported or corrupted image file. "
-                "Allowed types: JPEG, PNG, WebP."
-            )
+    # Determine MIME type: trust magic bytes first, then declared/extension
+    detected = _detect_mime_from_bytes(file_bytes)
+    if detected:
+        content_type = detected
+    else:
+        content_type = content_type_attr
+        if content_type not in ALLOWED_TYPES:
+            ext_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                       ".png": "image/png", ".webp": "image/webp"}
+            for ext, mime in ext_map.items():
+                if filename_attr.lower().endswith(ext):
+                    content_type = mime
+                    break
+    if content_type not in ALLOWED_TYPES:
+        raise AssetUploadError(
+            f"Unsupported file type: {content_type or 'unknown'}. "
+            "Allowed types: JPEG, PNG, WebP."
+        )
 
     # Generate a safe UUID filename
     asset_id = str(uuid.uuid4())

@@ -161,32 +161,31 @@ class TestDeleteAsset:
         assert resp.status_code == 404
 
 
-class TestMagicBytesValidation:
-    def test_valid_png(self):
-        from app.routers.assets import _validate_magic_bytes
+class TestMimeDetection:
+    def test_detect_png(self):
+        from app.routers.assets import _detect_mime_from_bytes
         header = b"\x89PNG\r\n\x1a\n" + b"\x00" * 4
-        assert _validate_magic_bytes(header, "image/png") is True
+        assert _detect_mime_from_bytes(header) == "image/png"
 
-    def test_valid_jpeg(self):
-        from app.routers.assets import _validate_magic_bytes
+    def test_detect_jpeg(self):
+        from app.routers.assets import _detect_mime_from_bytes
         header = b"\xff\xd8\xff\xe0" + b"\x00" * 8
-        assert _validate_magic_bytes(header, "image/jpeg") is True
+        assert _detect_mime_from_bytes(header) == "image/jpeg"
 
-    def test_valid_webp(self):
-        from app.routers.assets import _validate_magic_bytes
+    def test_detect_webp(self):
+        from app.routers.assets import _detect_mime_from_bytes
         header = b"RIFF" + b"\x00\x00\x00\x00" + b"WEBP"
-        assert _validate_magic_bytes(header, "image/webp") is True
+        assert _detect_mime_from_bytes(header) == "image/webp"
 
     def test_invalid_webp_missing_marker(self):
-        from app.routers.assets import _validate_magic_bytes
+        from app.routers.assets import _detect_mime_from_bytes
         header = b"RIFF" + b"\x00\x00\x00\x00" + b"AVI "
-        assert _validate_magic_bytes(header, "image/webp") is False
+        assert _detect_mime_from_bytes(header) is None
 
-    def test_unknown_type(self):
-        from app.routers.assets import _validate_magic_bytes
-        assert _validate_magic_bytes(b"\x00" * 12, "application/pdf") is False
+    def test_unknown_bytes(self):
+        from app.routers.assets import _detect_mime_from_bytes
+        assert _detect_mime_from_bytes(b"\x00" * 12) is None
 
-    def test_mismatched_magic(self):
-        from app.routers.assets import _validate_magic_bytes
-        jpeg_header = b"\xff\xd8\xff\xe0" + b"\x00" * 8
-        assert _validate_magic_bytes(jpeg_header, "image/png") is False
+    def test_too_short(self):
+        from app.routers.assets import _detect_mime_from_bytes
+        assert _detect_mime_from_bytes(b"\x89P") is None

@@ -9,6 +9,9 @@ from app.core.exceptions import GenerationError
 from app.models.template import BannerTemplate, Slot, SlotType, TemplateDesign
 
 
+_DEFAULT_FONT_FAMILY = "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif"
+
+
 class SvgRenderer:
     """Renders a BannerTemplate with slot values into an SVG string."""
 
@@ -122,7 +125,7 @@ class SvgRenderer:
 
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
-            "font-family": "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif",
+            "font-family": _DEFAULT_FONT_FAMILY,
             "font-size": font_size_num,
             "font-weight": slot.font_weight or "normal",
             "fill": slot.color or "#000000",
@@ -175,7 +178,7 @@ class SvgRenderer:
 
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
-            "font-family": "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif",
+            "font-family": _DEFAULT_FONT_FAMILY,
             "font-size": font_size_num, "font-weight": "bold",
             "fill": text_color, "text-anchor": "middle", "dominant-baseline": "central",
         })
@@ -193,7 +196,7 @@ class SvgRenderer:
         label = slot.description or f"{slot.type.value}: {slot.id}"
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
-            "font-family": "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif",
+            "font-family": _DEFAULT_FONT_FAMILY,
             "font-size": "12", "fill": "#999999",
             "text-anchor": "middle", "dominant-baseline": "central",
         })
@@ -250,7 +253,7 @@ class SvgRenderer:
         icon_y = y + 8 + icon_size / 2
         sparkle = ET.SubElement(svg, "text", attrib={
             "x": f"{icon_x:.1f}", "y": f"{icon_y:.1f}",
-            "font-family": "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif",
+            "font-family": _DEFAULT_FONT_FAMILY,
             "font-size": f"{icon_size:.0f}",
             "fill": "#6c5ce7",
             "text-anchor": "start", "dominant-baseline": "central",
@@ -263,7 +266,7 @@ class SvgRenderer:
 
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
-            "font-family": "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Arial, Apple Color Emoji, sans-serif",
+            "font-family": _DEFAULT_FONT_FAMILY,
             "font-size": "11", "fill": "#6c5ce7",
             "text-anchor": "middle", "dominant-baseline": "central",
         })
