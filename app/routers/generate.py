@@ -482,9 +482,18 @@ async def start_ai_generation(request: Request, pattern_id: str):
     svg_string = svg_renderer.render(template, slot_values)
     render_instruction = banner_service.create_render_instruction(pattern_id, slot_values)
 
+    # For custom templates, use the original uploaded image as AI reference
+    custom_ref_url = request.session.get(f"custom_ref_{pattern_id}")
+    custom_ref_bytes = None
+    if custom_ref_url:
+        ref_path = custom_ref_url.lstrip("/")
+        if os.path.isfile(ref_path):
+            with open(ref_path, "rb") as f:
+                custom_ref_bytes = f.read()
+
     asyncio.create_task(_render_ai_banner(
         job_id, svg_string, template.meta.width, template.meta.height,
-        render_instruction, nano_client, creative_direction,
+        render_instruction, nano_client, creative_direction, custom_ref_bytes,
     ))
 
     return templates.TemplateResponse(
@@ -497,11 +506,12 @@ async def start_ai_generation(request: Request, pattern_id: str):
 async def _render_ai_banner(
     job_id: str, svg_string: str, width: int, height: int,
     render_instruction, nano_client, creative_direction: str | None = None,
+    custom_ref_bytes: bytes | None = None,
 ) -> None:
     """Render SVG to PNG as reference, then send to AI for enhancement."""
     job = _jobs[job_id]
     try:
-        # Step 1: Render SVG → PNG (reference)
+        # Step 1: Render SVG → PNG
         job["progress"] = 10
         svg_for_render = await asyncio.to_thread(_embed_local_images, svg_string)
         png_bytes = await asyncio.to_thread(_svg_to_png, svg_for_render, width, height)
@@ -512,9 +522,10 @@ async def _render_ai_banner(
         job["file_url"] = f"/static/generated/{svg_filename}"
         job["progress"] = 20
 
-        # Step 2: Send to AI with reference image
+        # Step 2: Send to AI — use original uploaded image for custom templates
+        reference_bytes = custom_ref_bytes if custom_ref_bytes else png_bytes
         ai_job_id = await nano_client.generate_from_reference(
-            reference_image_bytes=png_bytes,
+            reference_image_bytes=reference_bytes,
             instruction=render_instruction.model_dump(),
             user_prompt=creative_direction,
         )

@@ -176,6 +176,99 @@ class NanoBananaClient:
         job_id = await self.submit_render(instruction, user_prompt=prompt)
         return job_id
 
+    async def analyze_banner(self, image_bytes: bytes, width: int, height: int, mime_type: str = "image/png") -> str:
+        """Send a banner image to AI and get back XML template definition."""
+        model = self._get_model()
+
+        prompt = f"""Analyze this banner image and generate a valid XML template definition.
+
+The banner is {width}x{height} pixels. Identify ALL visual elements: text regions, image regions, buttons, backgrounds.
+
+Output ONLY valid XML in this exact format (no markdown, no explanation):
+
+<banner_templates category="custom">
+  <banner_template>
+    <meta>
+      <category>custom</category>
+      <pattern_id>custom_001</pattern_id>
+      <pattern_name>Custom Banner</pattern_name>
+      <width>{width}</width>
+      <height>{height}</height>
+      <unit>px</unit>
+      <aspect_ratio>auto</aspect_ratio>
+      <layout_type>custom</layout_type>
+      <recommended_use>Custom banner</recommended_use>
+    </meta>
+    <design>
+      <background_type>color</background_type>
+      <background_value>#FFFFFF</background_value>
+      <primary_color>#000000</primary_color>
+      <accent_color>#FF0000</accent_color>
+      <font_style>NotoSansJP</font_style>
+    </design>
+    <slots>
+      <!-- For each detected element, create a slot: -->
+      <slot>
+        <id>unique_id</id>
+        <type>text OR image OR button</type>
+        <x>percentage 0-100</x>
+        <y>percentage 0-100</y>
+        <width>percentage 0-100</width>
+        <height>percentage 0-100</height>
+        <description>what this element is</description>
+        <required>true</required>
+        <!-- For text: -->
+        <max_chars>50</max_chars>
+        <font_size_guideline>16px</font_size_guideline>
+        <font_weight>normal OR bold</font_weight>
+        <color>#000000</color>
+        <!-- For text slots, include detected text in default_label: -->
+        <default_label>detected text content here</default_label>
+        <!-- For buttons: -->
+        <default_label>button text</default_label>
+        <bg_color>#000000</bg_color>
+        <text_color>#FFFFFF</text_color>
+      </slot>
+    </slots>
+    <rules>
+      <rule>Custom banner template generated from uploaded image.</rule>
+    </rules>
+  </banner_template>
+</banner_templates>
+
+Important:
+- Use percentage coordinates (0-100) for x, y, width, height relative to the canvas
+- Detect the actual background color from the image
+- Detect actual text content and include it in default_label
+- Detect actual font sizes, weights, and colors
+- Identify image regions as type "image"
+- Identify button-like elements as type "button"
+- Use descriptive Japanese for the description field
+- Output ONLY the XML, nothing else"""
+
+        image_part = {"mime_type": mime_type, "data": image_bytes}
+
+        response = await asyncio.to_thread(
+            model.generate_content, [prompt, image_part]
+        )
+
+        # Extract text response
+        text = ""
+        if response.parts:
+            for part in response.parts:
+                if hasattr(part, "text") and part.text:
+                    text += part.text
+
+        # Strip markdown code fences if present
+        text = text.strip()
+        if text.startswith("```"):
+            lines = text.split("\n")
+            # Remove first and last lines (code fences)
+            lines = [l for l in lines if not l.strip().startswith("```")]
+            text = "\n".join(lines)
+
+        return text.strip()
+
     async def generate_from_reference(
         self,
         reference_image_bytes: bytes,

@@ -89,6 +89,12 @@ try:
 except (ImportError, AttributeError) as exc:
     logger.warning("Could not import image_generate router: %s", exc)
 
+try:
+    from app.routers import custom
+    _routers.append(custom.router)
+except (ImportError, AttributeError) as exc:
+    logger.warning("Could not import custom router: %s", exc)
+
 
 # ---------------------------------------------------------------------------
 # Startup / shutdown logic

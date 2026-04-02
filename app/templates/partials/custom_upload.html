@@ -1,0 +1,81 @@
+<div class="max-w-lg mx-auto py-12">
+  <div class="text-center mb-6">
+    <h2 class="text-lg font-semibold text-gray-700">カスタムバナー</h2>
+    <p class="text-sm text-gray-400 mt-1">既存のバナー画像をアップロードすると、AIが分析して編集可能なテンプレートを作成します</p>
+  </div>
+
+  <!-- Upload zone -->
+  <div
+    id="custom-dropzone"
+    class="relative border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer"
+    ondragover="event.preventDefault(); this.classList.add('border-indigo-400', 'bg-indigo-50')"
+    ondragleave="this.classList.remove('border-indigo-400', 'bg-indigo-50')"
+    ondrop="event.preventDefault(); this.classList.remove('border-indigo-400', 'bg-indigo-50'); uploadCustomBanner(event.dataTransfer.files[0])"
+    onclick="document.getElementById('custom-upload-input').click()"
+  >
+    <svg class="mx-auto w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    </svg>
+    <p class="text-sm font-medium text-gray-600">バナー画像をドラッグ&ドロップ</p>
+    <p class="text-xs text-gray-400 mt-1">またはクリックして選択（JPEG, PNG, WebP）</p>
+
+    <input
+      type="file"
+      id="custom-upload-input"
+      accept="image/png,image/jpeg,image/webp"
+      class="hidden"
+      onchange="uploadCustomBanner(this.files[0])"
+    >
+  </div>
+
+  <!-- Status area -->
+  <div id="custom-upload-status" class="mt-4"></div>
+</div>
+
+<script>
+function uploadCustomBanner(file) {
+  if (!file) return;
+
+  var statusEl = document.getElementById('custom-upload-status');
+  var dropzone = document.getElementById('custom-dropzone');
+
+  // Show loading state
+  statusEl.innerHTML = '<div class="flex items-center justify-center gap-3 py-4">' +
+    '<svg class="animate-spin h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">' +
+    '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+    '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>' +
+    '<span class="text-sm text-gray-600">AIが画像を分析中...</span></div>';
+  dropzone.style.opacity = '0.5';
+  dropzone.style.pointerEvents = 'none';
+
+  var formData = new FormData();
+  formData.append('file', file, file.name);
+
+  fetch('/api/custom/upload', {
+    method: 'POST',
+    body: formData,
+  })
+  .then(function(response) {
+    // Check for HX-Redirect header
+    var redirect = response.headers.get('HX-Redirect');
+    if (redirect) {
+      window.location.href = redirect;
+      return;
+    }
+    return response.text();
+  })
+  .then(function(html) {
+    if (html) {
+      statusEl.innerHTML = html;
+      dropzone.style.opacity = '1';
+      dropzone.style.pointerEvents = 'auto';
+    }
+  })
+  .catch(function(err) {
+    statusEl.innerHTML = '<div class="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">アップロードに失敗しました。</div>';
+    dropzone.style.opacity = '1';
+    dropzone.style.pointerEvents = 'auto';
+  });
+}
+</script>

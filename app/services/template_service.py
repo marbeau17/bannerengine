@@ -106,6 +106,10 @@ class TemplateService:
         """Return every loaded template."""
         return list(self._templates.values())
 
+    def register_template(self, template: BannerTemplate) -> None:
+        """Register a dynamically created template (e.g. from AI analysis)."""
+        self._templates[template.meta.pattern_id] = template
+
     # Alias used by routers
     list_templates = get_all_templates
 

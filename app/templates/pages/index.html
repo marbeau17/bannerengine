@@ -1,44 +1,83 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="max-w-screen-2xl mx-auto px-4 py-6 flex gap-6">
+<div class="max-w-screen-2xl mx-auto px-4 py-6">
 
-  <!-- Left sidebar: category filter -->
-  <aside class="w-64 flex-shrink-0">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sticky top-4">
-      <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">カテゴリ</h2>
-      <div id="category-list">
-        {% include "partials/category_list.html" %}
+  <!-- Tab navigation -->
+  <div class="flex border-b border-gray-200 mb-6">
+    <button
+      id="tab-btn-templates"
+      onclick="switchTab('templates')"
+      class="px-4 py-2.5 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600"
+    >テンプレート一覧</button>
+    <button
+      id="tab-btn-custom"
+      onclick="switchTab('custom')"
+      class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700"
+    >カスタムバナー</button>
+  </div>
+
+  <!-- Tab: Template list -->
+  <div id="tab-templates" class="flex gap-6">
+    <!-- Left sidebar: category filter -->
+    <aside class="w-64 flex-shrink-0">
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sticky top-4">
+        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">カテゴリ</h2>
+        <div id="category-list">
+          {% include "partials/category_list.html" %}
+        </div>
       </div>
-    </div>
-  </aside>
+    </aside>
 
-  <!-- Main area -->
-  <div class="flex-1 min-w-0">
-    <!-- Search bar -->
-    <div class="mb-6">
-      <div class="relative">
-        <input
-          type="search"
-          name="q"
-          placeholder="テンプレートを検索..."
-          class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-          hx-get="/api/templates"
-          hx-trigger="input changed delay:300ms"
-          hx-target="#template-grid"
-          hx-include="this"
-        >
-        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-        </svg>
+    <!-- Main area -->
+    <div class="flex-1 min-w-0">
+      <!-- Search bar -->
+      <div class="mb-6">
+        <div class="relative">
+          <input
+            type="search"
+            name="q"
+            placeholder="テンプレートを検索..."
+            class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+            hx-get="/api/templates"
+            hx-trigger="input changed delay:300ms"
+            hx-target="#template-grid"
+            hx-include="this"
+          >
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </div>
       </div>
-    </div>
 
-    <!-- Template grid -->
-    <div id="template-grid">
-      {% include "partials/template_grid.html" %}
+      <!-- Template grid -->
+      <div id="template-grid">
+        {% include "partials/template_grid.html" %}
+      </div>
     </div>
   </div>
 
+  <!-- Tab: Custom banner -->
+  <div id="tab-custom" class="hidden">
+    {% include "partials/custom_upload.html" %}
+  </div>
+
 </div>
+
+<script>
+function switchTab(tab) {
+  var tabs = ['templates', 'custom'];
+  tabs.forEach(function(t) {
+    document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+    var btn = document.getElementById('tab-btn-' + t);
+    if (t === tab) {
+      btn.classList.add('border-indigo-600', 'text-indigo-600');
+      btn.classList.remove('border-transparent', 'text-gray-500');
+    } else {
+      btn.classList.remove('border-indigo-600', 'text-indigo-600');
+      btn.classList.add('border-transparent', 'text-gray-500');
+    }
+  });
+}
+</script>
 {% endblock %}
