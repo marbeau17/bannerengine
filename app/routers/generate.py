@@ -452,6 +452,10 @@ async def start_ai_generation(request: Request, pattern_id: str):
     nano_client = request.app.state.nano_banana_client
     template = template_service.get_template(pattern_id)
 
+    # Parse optional creative direction from form data
+    form = await request.form()
+    creative_direction = str(form.get("creative_direction", "") or "").strip() or None
+
     slot_values = request.session.get(f"slots_{pattern_id}", {})
 
     missing_slots = [s.id for s in template.slots if s.required and s.id not in slot_values]
@@ -480,7 +484,7 @@ async def start_ai_generation(request: Request, pattern_id: str):
 
     asyncio.create_task(_render_ai_banner(
         job_id, svg_string, template.meta.width, template.meta.height,
-        render_instruction, nano_client,
+        render_instruction, nano_client, creative_direction,
     ))
 
     return templates.TemplateResponse(
@@ -492,7 +496,7 @@ async def start_ai_generation(request: Request, pattern_id: str):
 
 async def _render_ai_banner(
     job_id: str, svg_string: str, width: int, height: int,
-    render_instruction, nano_client,
+    render_instruction, nano_client, creative_direction: str | None = None,
 ) -> None:
     """Render SVG to PNG as reference, then send to AI for enhancement."""
     job = _jobs[job_id]
@@ -512,6 +516,7 @@ async def _render_ai_banner(
         ai_job_id = await nano_client.generate_from_reference(
             reference_image_bytes=png_bytes,
             instruction=render_instruction.model_dump(),
+            user_prompt=creative_direction,
         )
 
         # Step 3: Poll AI generation

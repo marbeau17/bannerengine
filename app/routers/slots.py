@@ -70,6 +70,31 @@ async def update_slot(request: Request, pattern_id: str, slot_id: str):
 
 
 
+    # Handle design property updates (pseudo-slot "_design")
+    if slot_id == "_design":
+        form_data = await request.form()
+        session_slots = _get_session_slots(request, pattern_id)
+        design = session_slots.get("_design", {})
+        if not isinstance(design, dict):
+            design = {}
+        bg = form_data.get("content", form_data.get("value", ""))
+        if bg:
+            design["background_value"] = str(bg)
+        session_slots["_design"] = design
+        _set_session_slots(request, pattern_id, session_slots)
+
+        # Apply design override to template for rendering
+        effective_template = template.model_copy(deep=True)
+        if design.get("background_value"):
+            effective_template.design.background_value = design["background_value"]
+
+        svg_markup = svg_renderer.render(effective_template, session_slots)
+        return templates.TemplateResponse(
+            request,
+            "partials/preview_canvas.html",
+            {"template": effective_template, "pattern_id": pattern_id, "svg_markup": svg_markup},
+        )
+
     # Find the target slot definition
     slot = next((s for s in template.slots if s.id == slot_id), None)
     if slot is None:
@@ -113,7 +138,18 @@ async def update_slot(request: Request, pattern_id: str, slot_id: str):
         if form_val is not None:
             existing[field] = str(form_val)
 
-    # Merge position/size overrides (all slot types)
+    # Merge position/size overrides (px → % conversion)
+    canvas_w = template.meta.width
+    canvas_h = template.meta.height
+    px_to_pct = {
+        "x_px": ("x", canvas_w), "y_px": ("y", canvas_h),
+        "width_px": ("width", canvas_w), "height_px": ("height", canvas_h),
+    }
+    for px_field, (pct_field, canvas_dim) in px_to_pct.items():
+        form_val = form_data.get(px_field)
+        if form_val is not None and str(form_val).strip():
+            existing[pct_field] = str(round(float(form_val) / canvas_dim * 100, 2))
+    # Also accept raw % values (backward compat)
     for field in ("x", "y", "width", "height"):
         form_val = form_data.get(field)
         if form_val is not None and str(form_val).strip():
@@ -122,8 +158,15 @@ async def update_slot(request: Request, pattern_id: str, slot_id: str):
     session_slots[slot_id] = existing
     _set_session_slots(request, pattern_id, session_slots)
 
+    # Apply design overrides if present
+    effective_template = template
+    design_overrides = session_slots.get("_design")
+    if isinstance(design_overrides, dict) and design_overrides.get("background_value"):
+        effective_template = template.model_copy(deep=True)
+        effective_template.design.background_value = design_overrides["background_value"]
+
     # Re-render SVG preview with current slot values
-    svg_markup = svg_renderer.render(template, session_slots)
+    svg_markup = svg_renderer.render(effective_template, session_slots)
 
     return templates.TemplateResponse(
         request,
