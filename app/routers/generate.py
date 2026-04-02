@@ -139,36 +139,300 @@ def _embed_local_images(svg_string: str) -> str:
 
 
 def _svg_to_png(svg_string: str, width: int, height: int) -> bytes:
-    """Convert SVG string to PNG bytes. Tries cairosvg first, falls back to
-    writing the SVG as a simple PNG placeholder via Pillow."""
+    """Convert SVG string to PNG bytes.
+
+    Tries cairosvg first (best quality), then falls back to a pure-Python
+    Pillow-based renderer that parses the SVG elements directly. The Pillow
+    fallback works on Vercel and other environments without system Cairo libs.
+    """
     try:
         import cairosvg
         return cairosvg.svg2png(bytestring=svg_string.encode("utf-8"),
                                 output_width=width, output_height=height)
-    except ImportError:
+    except (ImportError, OSError):
         pass
 
-    # Fallback: render a simple PNG with the SVG embedded as text info
+    return _pillow_svg_render(svg_string, width, height)
+
+
+def _pillow_svg_render(svg_string: str, width: int, height: int) -> bytes:
+    """Pure-Python SVG to PNG renderer using Pillow.
+
+    Parses SVG elements (rect, text, image) and draws them with Pillow.
+    Handles the subset of SVG that our SvgRenderer produces, including
+    clip-path clipping and preserveAspectRatio="xMidYMid slice" for images.
+    """
+    import base64
+    import xml.etree.ElementTree as ET
+
     from PIL import Image, ImageDraw, ImageFont
-    img = Image.new("RGB", (width, height), color=(255, 255, 255))
+
+    SVG_NS = "http://www.w3.org/2000/svg"
+    XLINK_NS = "http://www.w3.org/1999/xlink"
+
+    img = Image.new("RGBA", (width, height), (255, 255, 255, 255))
     draw = ImageDraw.Draw(img)
 
-    # Draw a border
-    draw.rectangle([0, 0, width - 1, height - 1], outline=(200, 200, 200), width=2)
+    # Japanese-capable font search paths (macOS, Linux, Vercel)
+    _FONT_PATHS = [
+        "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    _BOLD_FONT_PATHS = [
+        "/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ]
 
-    # Draw centered text
-    text = "Banner Preview (install cairosvg for full render)"
-    try:
-        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 20)
-    except (OSError, IOError):
+    _font_cache: dict[tuple, ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
+
+    def _get_font(size: float, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+        key = (int(size), bold)
+        if key in _font_cache:
+            return _font_cache[key]
+        sz = max(int(size), 8)
+        paths = _BOLD_FONT_PATHS if bold else _FONT_PATHS
+        for fp in paths:
+            try:
+                font = ImageFont.truetype(fp, sz)
+                _font_cache[key] = font
+                return font
+            except (OSError, IOError):
+                continue
+        # Try regular paths as fallback for bold
+        if bold:
+            for fp in _FONT_PATHS:
+                try:
+                    font = ImageFont.truetype(fp, sz)
+                    _font_cache[key] = font
+                    return font
+                except (OSError, IOError):
+                    continue
         font = ImageFont.load_default()
-    bbox = draw.textbbox((0, 0), text, font=font)
-    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    draw.text(((width - tw) / 2, (height - th) / 2), text, fill=(100, 100, 100), font=font)
+        _font_cache[key] = font
+        return font
+
+    def _parse_color(color_str: str) -> tuple[int, int, int, int]:
+        if not color_str:
+            return (0, 0, 0, 255)
+        color_str = color_str.strip()
+        if color_str.startswith("#"):
+            h = color_str.lstrip("#")
+            if len(h) == 3:
+                h = "".join(c * 2 for c in h)
+            if len(h) == 6:
+                return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), 255)
+            if len(h) == 8:
+                return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), int(h[6:8], 16))
+        named = {
+            "white": (255, 255, 255, 255), "black": (0, 0, 0, 255),
+            "red": (255, 0, 0, 255), "blue": (0, 0, 255, 255),
+            "green": (0, 128, 0, 255), "none": (0, 0, 0, 0),
+        }
+        return named.get(color_str.lower(), (0, 0, 0, 255))
+
+    def _pf(val: str | None, default: float = 0.0) -> float:
+        if val is None:
+            return default
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return default
+
+    try:
+        root = ET.fromstring(svg_string)
+    except ET.ParseError:
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+
+    # Parse clip-path definitions from <defs>
+    clip_rects: dict[str, tuple[float, float, float, float]] = {}
+    for defs in root.iter(f"{{{SVG_NS}}}defs"):
+        for cp in defs.iter(f"{{{SVG_NS}}}clipPath"):
+            cp_id = cp.get("id", "")
+            for rect in cp.iter(f"{{{SVG_NS}}}rect"):
+                cx = _pf(rect.get("x"))
+                cy = _pf(rect.get("y"))
+                cw = _pf(rect.get("width"))
+                ch = _pf(rect.get("height"))
+                clip_rects[cp_id] = (cx, cy, cw, ch)
+
+    # Process elements in document order (skip defs children)
+    def _process_children(parent: ET.Element) -> None:
+        nonlocal draw
+        for elem in parent:
+            tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
+
+            if tag == "defs":
+                continue  # Already parsed above
+
+            elif tag == "rect":
+                x = _pf(elem.get("x"))
+                y = _pf(elem.get("y"))
+                w = _pf(elem.get("width"))
+                h = _pf(elem.get("height"))
+
+                # Clamp to canvas bounds
+                x2 = min(x + w, width)
+                y2 = min(y + h, height)
+                if x2 <= x or y2 <= y:
+                    continue
+
+                fill = elem.get("fill", "#ffffff")
+                fill_color = _parse_color(fill)
+
+                if fill.lower() != "none" and fill_color[3] > 0:
+                    opacity = elem.get("fill-opacity")
+                    if opacity is not None:
+                        fill_color = (*fill_color[:3], int(float(opacity) * 255))
+
+                    rx = _pf(elem.get("rx"))
+                    if rx > 0:
+                        draw.rounded_rectangle([x, y, x2, y2], radius=int(rx), fill=fill_color)
+                    else:
+                        draw.rectangle([x, y, x2, y2], fill=fill_color)
+
+                stroke = elem.get("stroke")
+                if stroke and stroke.lower() != "none":
+                    stroke_color = _parse_color(stroke)
+                    stroke_w = max(int(_pf(elem.get("stroke-width"), 1)), 1)
+                    dash = elem.get("stroke-dasharray")
+                    # Pillow doesn't support dashed lines natively, draw solid
+                    rx = _pf(elem.get("rx"))
+                    if rx > 0:
+                        draw.rounded_rectangle([x, y, x2, y2], radius=int(rx),
+                                               outline=stroke_color, width=stroke_w)
+                    else:
+                        draw.rectangle([x, y, x2, y2], outline=stroke_color, width=stroke_w)
+
+            elif tag == "text":
+                x = _pf(elem.get("x"))
+                y = _pf(elem.get("y"))
+                fill = elem.get("fill", "#000000")
+                fill_color = _parse_color(fill)
+                font_size = _pf(elem.get("font-size"), 16)
+                font_weight = elem.get("font-weight", "normal")
+                text_content = elem.text or ""
+                if not text_content.strip():
+                    continue
+
+                is_bold = font_weight.lower() in ("bold", "700", "800", "900")
+                font = _get_font(font_size, bold=is_bold)
+                anchor = elem.get("text-anchor", "start")
+
+                bbox = draw.textbbox((0, 0), text_content, font=font)
+                tw = bbox[2] - bbox[0]
+                th = bbox[3] - bbox[1]
+
+                tx = x
+                if anchor == "middle":
+                    tx = x - tw / 2
+                elif anchor == "end":
+                    tx = x - tw
+
+                baseline = elem.get("dominant-baseline", "auto")
+                ty = y
+                if baseline == "central":
+                    ty = y - th / 2
+                elif baseline == "hanging":
+                    pass
+                else:
+                    ty = y - th * 0.85  # Approximate alphabetic baseline
+
+                draw.text((tx, ty), text_content, fill=fill_color[:3], font=font)
+
+            elif tag == "image":
+                href = elem.get("href") or elem.get(f"{{{XLINK_NS}}}href", "")
+                x = _pf(elem.get("x"))
+                y = _pf(elem.get("y"))
+                w = _pf(elem.get("width"))
+                h = _pf(elem.get("height"))
+
+                if not href or w <= 0 or h <= 0:
+                    continue
+
+                try:
+                    img_bytes = _load_image_bytes(href)
+                    if img_bytes is None:
+                        continue
+
+                    sub_img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+
+                    # Determine clip region
+                    clip_ref = elem.get("clip-path", "")
+                    clip_id = clip_ref.replace("url(#", "").rstrip(")") if clip_ref else ""
+                    clip = clip_rects.get(clip_id)
+
+                    # Use clip rect as the target area if available
+                    target_x = clip[0] if clip else x
+                    target_y = clip[1] if clip else y
+                    target_w = clip[2] if clip else w
+                    target_h = clip[3] if clip else h
+
+                    # Implement preserveAspectRatio="xMidYMid slice":
+                    # Scale image to cover the target area, then crop center
+                    src_w, src_h = sub_img.size
+                    scale = max(target_w / src_w, target_h / src_h)
+                    scaled_w = int(src_w * scale)
+                    scaled_h = int(src_h * scale)
+                    sub_img = sub_img.resize((scaled_w, scaled_h), Image.LANCZOS)
+
+                    # Crop to target dimensions from center
+                    crop_x = (scaled_w - int(target_w)) // 2
+                    crop_y = (scaled_h - int(target_h)) // 2
+                    sub_img = sub_img.crop((
+                        crop_x, crop_y,
+                        crop_x + int(target_w), crop_y + int(target_h),
+                    ))
+
+                    img.paste(sub_img, (int(target_x), int(target_y)), sub_img)
+                except Exception:
+                    continue
+
+            # Recurse into child elements (e.g. <g> groups)
+            if len(elem) > 0 and tag not in ("text",):
+                _process_children(elem)
+
+    _process_children(root)
+
+    # Convert RGBA to RGB
+    output = Image.new("RGB", img.size, (255, 255, 255))
+    output.paste(img, mask=img.split()[3])
 
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    output.save(buf, format="PNG", quality=95)
     return buf.getvalue()
+
+
+def _load_image_bytes(href: str) -> bytes | None:
+    """Load image bytes from a data URI, local path, or URL."""
+    import base64
+
+    if href.startswith("data:"):
+        _, b64data = href.split(",", 1)
+        return base64.b64decode(b64data)
+    elif href.startswith("/"):
+        local_path = href.lstrip("/")
+        if os.path.isfile(local_path):
+            with open(local_path, "rb") as f:
+                return f.read()
+    elif href.startswith(("http://", "https://")):
+        try:
+            import httpx
+            resp = httpx.get(href, timeout=10, follow_redirects=True)
+            if resp.status_code == 200:
+                return resp.content
+        except Exception:
+            pass
+    return None
 
 
 @router.get("/progress/{job_id}", response_class=HTMLResponse)
