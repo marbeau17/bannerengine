@@ -438,6 +438,116 @@ def _load_image_bytes(href: str) -> bytes | None:
     return None
 
 
+@router.post("/ai/{pattern_id}", response_class=HTMLResponse)
+async def start_ai_generation(request: Request, pattern_id: str):
+    """Start AI-enhanced banner generation using Nano Banana Pro.
+
+    Renders the SVG preview to PNG as a reference image, then sends it
+    to the AI model with a structured prompt to generate a polished version.
+    Returns both the SVG-based and AI-generated versions for comparison.
+    """
+    template_service = request.app.state.template_service
+    svg_renderer = request.app.state.svg_renderer
+    banner_service = request.app.state.banner_service
+    nano_client = request.app.state.nano_banana_client
+    template = template_service.get_template(pattern_id)
+
+    slot_values = request.session.get(f"slots_{pattern_id}", {})
+
+    missing_slots = [s.id for s in template.slots if s.required and s.id not in slot_values]
+    if missing_slots:
+        slot_names = ", ".join(missing_slots)
+        return templates.TemplateResponse(
+            request,
+            "partials/generate_result.html",
+            {"status": "error", "error": f"未入力の必須スロットがあります: {slot_names}"},
+        )
+
+    _evict_old_jobs()
+    job_id = str(uuid.uuid4())
+    _jobs[job_id] = {
+        "job_id": job_id,
+        "pattern_id": pattern_id,
+        "status": "processing",
+        "progress": 0,
+        "file_url": None,
+        "ai_file_url": None,
+        "mode": "ai",
+    }
+
+    svg_string = svg_renderer.render(template, slot_values)
+    render_instruction = banner_service.create_render_instruction(pattern_id, slot_values)
+
+    asyncio.create_task(_render_ai_banner(
+        job_id, svg_string, template.meta.width, template.meta.height,
+        render_instruction, nano_client,
+    ))
+
+    return templates.TemplateResponse(
+        request,
+        "partials/generate_result.html",
+        {"status": "processing", "job_id": job_id, "progress": 0, "mode": "ai"},
+    )
+
+
+async def _render_ai_banner(
+    job_id: str, svg_string: str, width: int, height: int,
+    render_instruction, nano_client,
+) -> None:
+    """Render SVG to PNG as reference, then send to AI for enhancement."""
+    job = _jobs[job_id]
+    try:
+        # Step 1: Render SVG → PNG (reference)
+        job["progress"] = 10
+        svg_for_render = await asyncio.to_thread(_embed_local_images, svg_string)
+        png_bytes = await asyncio.to_thread(_svg_to_png, svg_for_render, width, height)
+
+        svg_filename = f"{job_id}_svg.png"
+        with open(os.path.join(OUTPUT_DIR, svg_filename), "wb") as f:
+            f.write(png_bytes)
+        job["file_url"] = f"/static/generated/{svg_filename}"
+        job["progress"] = 20
+
+        # Step 2: Send to AI with reference image
+        ai_job_id = await nano_client.generate_from_reference(
+            reference_image_bytes=png_bytes,
+            instruction=render_instruction.model_dump(),
+        )
+
+        # Step 3: Poll AI generation
+        while True:
+            status = await nano_client.get_status(ai_job_id)
+            job["progress"] = 20 + min(int(status.get("progress", 0) * 0.7), 70)
+            if status["status"] == "completed":
+                break
+            if status["status"] == "failed":
+                job["status"] = "failed"
+                job["error"] = status.get("error", "AI generation failed")
+                return
+            await asyncio.sleep(0.5)
+
+        # Step 4: Save AI result
+        ai_bytes = await nano_client.get_result(ai_job_id)
+        if not ai_bytes:
+            job["status"] = "failed"
+            job["error"] = "No image data returned from AI"
+            return
+
+        ai_filename = f"{job_id}_ai.png"
+        with open(os.path.join(OUTPUT_DIR, ai_filename), "wb") as f:
+            f.write(ai_bytes)
+
+        job["ai_file_url"] = f"/static/generated/{ai_filename}"
+        job["progress"] = 100
+        job["status"] = "completed"
+
+    except Exception as exc:
+        logger.error("AI banner generation failed for job %s: %s", job_id, exc)
+        job["status"] = "failed"
+        job["error"] = str(exc)
+        job["progress"] = 0
+
+
 @router.get("/progress/{job_id}", response_class=HTMLResponse)
 async def generation_progress(request: Request, job_id: str):
     """Return the current generation status as an HTML partial for htmx polling."""
@@ -457,6 +567,8 @@ async def generation_progress(request: Request, job_id: str):
             "job_id": job_id,
             "progress": job["progress"],
             "file_url": job.get("file_url"),
+            "ai_file_url": job.get("ai_file_url"),
+            "mode": job.get("mode", "svg"),
             "error": job.get("error"),
         },
     )

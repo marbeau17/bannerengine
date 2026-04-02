@@ -60,6 +60,14 @@ async def start_image_generation(request: Request, pattern_id: str, slot_id: str
     width = max(width, 256)
     height = max(height, 256)
 
+    # Auto-append image requirements to prompt
+    extra = [f"\n\nImage requirements: {width}x{height} pixels."]
+    if slot.format_hint:
+        extra.append(f"Format: {slot.format_hint}.")
+    if slot.description:
+        extra.append(f"Context: {slot.description}")
+    prompt = prompt + " ".join(extra)
+
     # Start generation
     image_gen_service = request.app.state.image_generation_service
     job_id = await image_gen_service.generate_for_slot(

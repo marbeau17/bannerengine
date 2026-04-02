@@ -65,33 +65,43 @@ class SvgRenderer:
             fill = bg_value if bg_value else "#ffffff"
             ET.SubElement(svg, "rect", attrib={"x": "0", "y": "0", "width": str(w), "height": str(h), "fill": fill})
 
+    @staticmethod
+    def _effective_geometry(slot: Slot, value: Any) -> tuple[float, float, float, float]:
+        """Return (x%, y%, width%, height%) using session overrides if present."""
+        if isinstance(value, dict):
+            x = float(value["x"]) if value.get("x") else slot.x
+            y = float(value["y"]) if value.get("y") else slot.y
+            w = float(value["width"]) if value.get("width") else slot.width
+            h = float(value["height"]) if value.get("height") else slot.height
+            return (x, y, w, h)
+        return (slot.x, slot.y, slot.width, slot.height)
+
     def _render_slot(self, svg: ET.Element, slot: Slot, value: Any, template: BannerTemplate) -> None:
         w, h = template.meta.width, template.meta.height
 
         normalised = self._normalise_value(slot, value)
 
-        # Check for AI prompt with no image yet (prompt pending generation)
-        # Only show prompt placeholder if there's a prompt but no usable image/value
+        # Check for AI prompt with no image yet
         prompt_text = self._extract_prompt(value)
         if prompt_text and not self._has_image_url(value) and (normalised is None or normalised == ""):
-            self._render_prompt_placeholder(svg, slot, prompt_text, w, h)
+            self._render_prompt_placeholder(svg, slot, value, prompt_text, w, h)
             return
 
         if normalised is None or normalised == "":
-            self._render_placeholder(svg, slot, w, h)
+            self._render_placeholder(svg, slot, value, w, h)
             return
 
         if slot.type in (SlotType.TEXT, SlotType.IMAGE_OR_TEXT):
             if slot.type == SlotType.IMAGE_OR_TEXT and isinstance(value, dict) and value.get("slot_type") == "image":
-                self._render_image_slot(svg, slot, normalised, w, h)
+                self._render_image_slot(svg, slot, value, normalised, w, h)
             else:
-                self._render_text_slot(svg, slot, normalised, w, h)
+                self._render_text_slot(svg, slot, value, normalised, w, h)
         elif slot.type == SlotType.IMAGE:
-            self._render_image_slot(svg, slot, normalised, w, h)
+            self._render_image_slot(svg, slot, value, normalised, w, h)
         elif slot.type == SlotType.BUTTON:
-            self._render_button_slot(svg, slot, normalised, w, h)
+            self._render_button_slot(svg, slot, value, normalised, w, h)
         else:
-            self._render_text_slot(svg, slot, str(normalised), w, h)
+            self._render_text_slot(svg, slot, value, str(normalised), w, h)
 
     @staticmethod
     def _normalise_value(slot: Slot, value: Any) -> Any:
@@ -103,7 +113,7 @@ class SvgRenderer:
             if slot.type == SlotType.IMAGE_OR_TEXT and value.get("slot_type") == "image":
                 return value.get("source_url", value.get("image_url", ""))
             if slot.type in (SlotType.TEXT, SlotType.IMAGE_OR_TEXT):
-                return value.get("text", value.get("label", value.get("value", "")))
+                return value.get("text", value.get("content", value.get("label", value.get("value", ""))))
             if slot.type == SlotType.IMAGE:
                 return value.get("source_url", value.get("image_url", ""))
             if slot.type == SlotType.BUTTON:
@@ -114,28 +124,36 @@ class SvgRenderer:
                 return getattr(value, attr)
         return str(value)
 
-    def _render_text_slot(self, svg: ET.Element, slot: Slot, value: str, w: int, h: int) -> None:
-        x, y = self._calc_px(slot.x, w), self._calc_px(slot.y, h)
-        sw, sh = self._calc_px(slot.width, w), self._calc_px(slot.height, h)
+    @staticmethod
+    def _extract_font_props(slot: Slot, raw_value: Any) -> tuple[str, str, str]:
+        """Extract (font_size_num, font_weight, color) from session overrides or slot defaults."""
+        fs = (raw_value.get("font_size") if isinstance(raw_value, dict) else None) or slot.font_size_guideline or "16"
+        fs_num = "".join(c for c in str(fs) if c.isdigit() or c == ".") or "16"
+        fw = (raw_value.get("font_weight") if isinstance(raw_value, dict) else None) or slot.font_weight or "normal"
+        clr = (raw_value.get("color") if isinstance(raw_value, dict) else None) or slot.color or "#000000"
+        return fs_num, fw, clr
 
-        font_size = slot.font_size_guideline or "16"
-        font_size_num = "".join(c for c in str(font_size) if c.isdigit() or c == ".")
-        if not font_size_num:
-            font_size_num = "16"
+    def _render_text_slot(self, svg: ET.Element, slot: Slot, raw_value: Any, value: str, w: int, h: int) -> None:
+        sx, sy, swidth, sheight = self._effective_geometry(slot, raw_value)
+        x, y = self._calc_px(sx, w), self._calc_px(sy, h)
+        sw, sh = self._calc_px(swidth, w), self._calc_px(sheight, h)
+
+        font_size_num, font_weight, color = self._extract_font_props(slot, raw_value)
 
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
             "font-family": _DEFAULT_FONT_FAMILY,
             "font-size": font_size_num,
-            "font-weight": slot.font_weight or "normal",
-            "fill": slot.color or "#000000",
+            "font-weight": font_weight,
+            "fill": color,
             "text-anchor": "middle", "dominant-baseline": "central",
         })
         text_elem.text = str(value)
 
-    def _render_image_slot(self, svg: ET.Element, slot: Slot, value: str, w: int, h: int) -> None:
-        x, y = self._calc_px(slot.x, w), self._calc_px(slot.y, h)
-        sw, sh = self._calc_px(slot.width, w), self._calc_px(slot.height, h)
+    def _render_image_slot(self, svg: ET.Element, slot: Slot, raw_value: Any, value: str, w: int, h: int) -> None:
+        sx, sy, swidth, sheight = self._effective_geometry(slot, raw_value)
+        x, y = self._calc_px(sx, w), self._calc_px(sy, h)
+        sw, sh = self._calc_px(swidth, w), self._calc_px(sheight, h)
         clip_id = f"clip-{slot.id}"
 
         clip_path = ET.SubElement(self._defs, "clipPath", attrib={"id": clip_id})
@@ -150,9 +168,10 @@ class SvgRenderer:
             "preserveAspectRatio": "xMidYMid slice", "clip-path": f"url(#{clip_id})",
         })
 
-    def _render_button_slot(self, svg: ET.Element, slot: Slot, value: Any, w: int, h: int) -> None:
-        x, y = self._calc_px(slot.x, w), self._calc_px(slot.y, h)
-        sw, sh = self._calc_px(slot.width, w), self._calc_px(slot.height, h)
+    def _render_button_slot(self, svg: ET.Element, slot: Slot, raw_value: Any, value: Any, w: int, h: int) -> None:
+        sx, sy, swidth, sheight = self._effective_geometry(slot, raw_value)
+        x, y = self._calc_px(sx, w), self._calc_px(sy, h)
+        sw, sh = self._calc_px(swidth, w), self._calc_px(sheight, h)
 
         if isinstance(value, dict):
             label = value.get("label", value.get("text", ""))
@@ -171,10 +190,8 @@ class SvgRenderer:
             "rx": "4", "ry": "4", "fill": bg_color,
         })
 
-        font_size = slot.font_size_guideline or "14"
-        font_size_num = "".join(c for c in str(font_size) if c.isdigit() or c == ".")
-        if not font_size_num:
-            font_size_num = "14"
+        font_size_num = (raw_value.get("font_size") if isinstance(raw_value, dict) else None) or slot.font_size_guideline or "14"
+        font_size_num = "".join(c for c in str(font_size_num) if c.isdigit() or c == ".") or "14"
 
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
@@ -184,9 +201,10 @@ class SvgRenderer:
         })
         text_elem.text = label if label else "Button"
 
-    def _render_placeholder(self, svg: ET.Element, slot: Slot, w: int, h: int) -> None:
-        x, y = self._calc_px(slot.x, w), self._calc_px(slot.y, h)
-        sw, sh = self._calc_px(slot.width, w), self._calc_px(slot.height, h)
+    def _render_placeholder(self, svg: ET.Element, slot: Slot, raw_value: Any, w: int, h: int) -> None:
+        sx, sy, swidth, sheight = self._effective_geometry(slot, raw_value)
+        x, y = self._calc_px(sx, w), self._calc_px(sy, h)
+        sw, sh = self._calc_px(swidth, w), self._calc_px(sheight, h)
 
         ET.SubElement(svg, "rect", attrib={
             "x": f"{x:.1f}", "y": f"{y:.1f}", "width": f"{sw:.1f}", "height": f"{sh:.1f}",
@@ -232,11 +250,12 @@ class SvgRenderer:
         return False
 
     def _render_prompt_placeholder(
-        self, svg: ET.Element, slot: Slot, prompt: str, w: int, h: int
+        self, svg: ET.Element, slot: Slot, raw_value: Any, prompt: str, w: int, h: int
     ) -> None:
         """Render a purple-tinted placeholder indicating an AI prompt is pending."""
-        x, y = self._calc_px(slot.x, w), self._calc_px(slot.y, h)
-        sw, sh = self._calc_px(slot.width, w), self._calc_px(slot.height, h)
+        sx, sy, swidth, sheight = self._effective_geometry(slot, raw_value)
+        x, y = self._calc_px(sx, w), self._calc_px(sy, h)
+        sw, sh = self._calc_px(swidth, w), self._calc_px(sheight, h)
 
         # Purple/indigo dashed border rectangle
         ET.SubElement(svg, "rect", attrib={

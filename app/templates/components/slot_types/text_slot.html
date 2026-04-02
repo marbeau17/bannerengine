@@ -1,10 +1,11 @@
+{% set cv = current_value if current_value is mapping else {'text': current_value} %}
 <div class="space-y-2">
   {% if current_slot.max_chars and current_slot.max_chars <= 60 %}
   <div>
     <input
       type="text"
       name="content"
-      value="{{ current_value.get('content', '') }}"
+      value="{{ cv.get('text', cv.get('content', '')) }}"
       placeholder="テキストを入力..."
       maxlength="{{ current_slot.max_chars or '' }}"
       class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
@@ -30,40 +31,77 @@
       hx-trigger="input changed delay:500ms"
       hx-sync="body:queue"
       hx-vals='{"slot_type": "text"}'
-    >{{ current_value.get('content', '') }}</textarea>
+    >{{ cv.get('text', cv.get('content', '')) }}</textarea>
   </div>
   {% endif %}
 
-  <!-- Character count -->
   {% if current_slot.max_chars %}
   <div class="flex items-center justify-between text-[11px] text-gray-400">
-    <span>
-      最大 {{ current_slot.max_chars }} 文字
-    </span>
+    <span>最大 {{ current_slot.max_chars }} 文字</span>
     <span class="tabular-nums">
-      <span class="char-count">{{ current_value.get('content', '') | length }}</span> / {{ current_slot.max_chars }}
+      <span class="char-count">{{ cv.get('text', cv.get('content', '')) | length }}</span> / {{ current_slot.max_chars }}
     </span>
   </div>
   {% endif %}
 
-  <!-- Meta info -->
-  <div class="flex items-center gap-3 text-[11px] text-gray-400">
-    {% if current_slot.font_size_guideline %}
-    <span class="flex items-center gap-1">
-      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/>
-      </svg>
-      {{ current_slot.font_size_guideline }}
-    </span>
-    {% endif %}
-    {% if current_slot.color %}
-    <span class="flex items-center gap-1">
-      <span class="inline-block w-3 h-3 rounded-full border border-gray-200" style="background-color: {{ current_slot.color }};"></span>
-      {{ current_slot.color }}
-    </span>
-    {% endif %}
-    {% if current_slot.font_weight %}
-    <span>{{ current_slot.font_weight }}</span>
-    {% endif %}
-  </div>
+  <!-- Style editors -->
+  <details class="border-t border-gray-100 pt-2 mt-1">
+    <summary class="text-[11px] font-medium text-gray-500 cursor-pointer hover:text-gray-700">スタイル設定</summary>
+    <div class="mt-2 space-y-2">
+      <!-- Font size -->
+      <div class="flex items-center gap-2">
+        <label class="text-[11px] text-gray-500 w-16 shrink-0">サイズ</label>
+        <input
+          type="number"
+          name="font_size"
+          value="{{ cv.get('font_size', current_slot.font_size_guideline | replace('px', '') if current_slot.font_size_guideline else '16') }}"
+          min="8" max="96" step="1"
+          class="w-20 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+          hx-patch="/api/slots/{{ pattern_id }}/{{ current_slot.id }}"
+          hx-target="#preview-canvas"
+          hx-swap="outerHTML"
+          hx-trigger="input changed delay:500ms"
+          hx-sync="body:queue"
+          hx-vals='{"slot_type": "text"}'
+        >
+        <span class="text-[10px] text-gray-400">px</span>
+      </div>
+
+      <!-- Font weight -->
+      <div class="flex items-center gap-2">
+        <label class="text-[11px] text-gray-500 w-16 shrink-0">太さ</label>
+        <select
+          name="font_weight"
+          class="w-20 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+          hx-patch="/api/slots/{{ pattern_id }}/{{ current_slot.id }}"
+          hx-target="#preview-canvas"
+          hx-swap="outerHTML"
+          hx-trigger="change"
+          hx-sync="body:queue"
+          hx-vals='{"slot_type": "text"}'
+        >
+          <option value="normal" {{ 'selected' if cv.get('font_weight', current_slot.font_weight or 'normal') == 'normal' }}>Normal</option>
+          <option value="bold" {{ 'selected' if cv.get('font_weight', current_slot.font_weight or 'normal') == 'bold' }}>Bold</option>
+        </select>
+      </div>
+
+      <!-- Color -->
+      <div class="flex items-center gap-2">
+        <label class="text-[11px] text-gray-500 w-16 shrink-0">色</label>
+        <input
+          type="color"
+          name="color"
+          value="{{ cv.get('color', current_slot.color or '#000000') }}"
+          class="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
+          hx-patch="/api/slots/{{ pattern_id }}/{{ current_slot.id }}"
+          hx-target="#preview-canvas"
+          hx-swap="outerHTML"
+          hx-trigger="input changed delay:300ms"
+          hx-sync="body:queue"
+          hx-vals='{"slot_type": "text"}'
+        >
+        <span class="text-[10px] text-gray-400">{{ cv.get('color', current_slot.color or '#000000') }}</span>
+      </div>
+    </div>
+  </details>
 </div>

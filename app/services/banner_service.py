@@ -122,11 +122,15 @@ class BannerService:
         canvas_w = template.meta.width
         canvas_h = template.meta.height
 
-        # Convert percentage coordinates to absolute pixels
-        abs_x = int(slot.x / 100.0 * canvas_w)
-        abs_y = int(slot.y / 100.0 * canvas_h)
-        abs_width = int(slot.width / 100.0 * canvas_w)
-        abs_height = int(slot.height / 100.0 * canvas_h)
+        # Convert percentage coordinates to absolute pixels (session overrides take priority)
+        sx = float(value.get("x", slot.x)) if isinstance(value, dict) and value.get("x") else slot.x
+        sy = float(value.get("y", slot.y)) if isinstance(value, dict) and value.get("y") else slot.y
+        sw = float(value.get("width", slot.width)) if isinstance(value, dict) and value.get("width") else slot.width
+        sh = float(value.get("height", slot.height)) if isinstance(value, dict) and value.get("height") else slot.height
+        abs_x = int(sx / 100.0 * canvas_w)
+        abs_y = int(sy / 100.0 * canvas_h)
+        abs_width = int(sw / 100.0 * canvas_w)
+        abs_height = int(sh / 100.0 * canvas_h)
 
         position = {"x": abs_x, "y": abs_y}
         size = {"width": abs_width, "height": abs_height}

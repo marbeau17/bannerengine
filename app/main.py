@@ -116,6 +116,9 @@ def _load_xml_templates(app_instance: FastAPI) -> None:
         app_instance.state.nano_banana_client = nano_client
         app_instance.state.image_generation_service = ImageGenerationService(nano_client)
 
+        from app.services.banner_service import BannerService
+        app_instance.state.banner_service = BannerService(service, nano_client)
+
         logger.info(
             "XML templates loaded successfully (%d templates)",
             len(service.get_all_templates()),

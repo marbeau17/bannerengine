@@ -85,24 +85,41 @@ async def update_slot(request: Request, pattern_id: str, slot_id: str):
     # Validate
     validation_errors = _validate_slot_value(slot, str(value))
 
-    # Persist to session regardless (so the user doesn't lose input)
+    # Persist to session using merge logic (so changing one property doesn't clobber others)
     session_slots = _get_session_slots(request, pattern_id)
+    existing = session_slots.get(slot_id, {})
+    if isinstance(existing, str):
+        existing = {"text": existing}  # migrate legacy string format
+
     slot_type = form_data.get("slot_type", "text")
-    if slot_type == "button":
-        session_slots[slot_id] = {
-            "label": str(value),
-            "bg_color": form_data.get("bg_color", slot.bg_color or "#333333"),
-            "text_color": form_data.get("text_color", slot.text_color or "#ffffff"),
-        }
-    elif slot_type == "image":
-        prompt = form_data.get("prompt", "")
-        session_slots[slot_id] = {
-            "source_url": str(value),
-            "prompt": str(prompt) if prompt else "",
-            "fit": form_data.get("fit", "cover"),
-        }
-    else:
-        session_slots[slot_id] = str(value)
+
+    # Merge content field
+    if value:
+        if slot_type == "button":
+            existing["label"] = str(value)
+        elif slot_type == "image":
+            existing["source_url"] = str(value)
+        else:
+            existing["text"] = str(value)
+
+    # Merge type-specific fields (only if present in form data)
+    _MERGE_FIELDS = {
+        "button": ("bg_color", "text_color", "font_size"),
+        "image": ("prompt", "fit"),
+        "text": ("font_size", "font_weight", "color"),
+    }
+    for field in _MERGE_FIELDS.get(slot_type, ()):
+        form_val = form_data.get(field)
+        if form_val is not None:
+            existing[field] = str(form_val)
+
+    # Merge position/size overrides (all slot types)
+    for field in ("x", "y", "width", "height"):
+        form_val = form_data.get(field)
+        if form_val is not None and str(form_val).strip():
+            existing[field] = str(form_val)
+
+    session_slots[slot_id] = existing
     _set_session_slots(request, pattern_id, session_slots)
 
     # Re-render SVG preview with current slot values
