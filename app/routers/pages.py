@@ -42,10 +42,22 @@ async def editor(request: Request, pattern_id: str):
     and a live preview canvas.
     """
     template_service = request.app.state.template_service
+    svg_renderer = request.app.state.svg_renderer
     template = template_service.get_template(pattern_id)
 
     # Retrieve any previously saved slot values from the session
     slot_values = request.session.get(f"slots_{pattern_id}", {})
+
+    # Pre-render the SVG so the canvas has draggable-slot groups from first load
+    try:
+        effective_template = template
+        design_overrides = slot_values.get("_design")
+        if isinstance(design_overrides, dict) and design_overrides.get("background_value"):
+            effective_template = template.model_copy(deep=True)
+            effective_template.design.background_value = design_overrides["background_value"]
+        svg_markup = svg_renderer.render(effective_template, slot_values)
+    except Exception:
+        svg_markup = None
 
     return templates.TemplateResponse(
         request,
@@ -55,5 +67,6 @@ async def editor(request: Request, pattern_id: str):
             "pattern_id": pattern_id,
             "slots": template.slots,
             "slot_values": slot_values,
+            "svg_markup": svg_markup,
         },
     )

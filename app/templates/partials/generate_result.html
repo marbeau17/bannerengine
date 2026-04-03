@@ -1,7 +1,7 @@
 {% if status == 'processing' %}
 <div
   class="space-y-2"
-  hx-get="/api/generate/progress/{{ job_id }}"
+  hx-get="{{ poll_url | default('/api/generate/progress/' ~ job_id) }}"
   hx-trigger="every 1s"
   hx-target="#generate-result"
   hx-swap="innerHTML"
@@ -68,13 +68,7 @@
         PNG
       </a>
       {% if pattern_id %}
-      <a href="/api/generate/psd/{{ pattern_id }}" download
-         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-md transition-colors">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
-        </svg>
-        PSD
-      </a>
+
       <a href="/api/generate/svg/{{ pattern_id }}" download
          class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-md transition-colors">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,13 +104,7 @@
     </a>
     {% endif %}
     {% if pattern_id %}
-    <a href="/api/generate/psd/{{ pattern_id }}" download
-       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-md transition-colors">
-      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
-      </svg>
-      PSD
-    </a>
+
     <a href="/api/generate/svg/{{ pattern_id }}" download
        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-md transition-colors">
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

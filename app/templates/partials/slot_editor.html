@@ -16,28 +16,42 @@
     <p class="text-xs text-gray-400 mb-2">{{ slot.description }}</p>
     {% endif %}
 
-    <!-- Slot-type-specific editor -->
-    {% if slot.type.value == 'text' %}
-      {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
-        {% include "components/slot_types/text_slot.html" %}
-        {% include "components/slot_position_editor.html" %}
-      {% endwith %}
-    {% elif slot.type.value == 'image' %}
-      {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
-        {% include "components/slot_types/image_slot.html" %}
-        {% include "components/slot_position_editor.html" %}
-      {% endwith %}
-    {% elif slot.type.value == 'button' %}
-      {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
-        {% include "components/slot_types/button_slot.html" %}
-        {% include "components/slot_position_editor.html" %}
-      {% endwith %}
-    {% elif slot.type.value == 'image_or_text' %}
-      {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
-        {% include "components/slot_types/image_or_text_slot.html" %}
-        {% include "components/slot_position_editor.html" %}
-      {% endwith %}
-    {% endif %}
+    <!-- Locked state (hidden by default; shown via JS when slot is AI-generated) -->
+    <div id="manual-slot-locked-{{ slot.id }}" class="hidden mb-2">
+      <div class="bg-gray-50 border border-gray-200 rounded-md p-2 flex items-start gap-2">
+        <span id="manual-slot-locked-text-{{ slot.id }}" class="flex-1 text-xs text-gray-600 break-words leading-relaxed italic"></span>
+        <button
+          type="button"
+          onclick="unlockSlot('{{ slot.id }}')"
+          class="text-[11px] text-indigo-500 hover:text-indigo-700 font-medium whitespace-nowrap shrink-0 mt-0.5"
+        >編集</button>
+      </div>
+    </div>
+
+    <!-- Slot-type-specific editors (hidden when slot is locked) -->
+    <div id="manual-slot-editors-{{ slot.id }}">
+      {% if slot.type.value == 'text' %}
+        {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
+          {% include "components/slot_types/text_slot.html" %}
+          {% include "components/slot_position_editor.html" %}
+        {% endwith %}
+      {% elif slot.type.value == 'image' %}
+        {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
+          {% include "components/slot_types/image_slot.html" %}
+          {% include "components/slot_position_editor.html" %}
+        {% endwith %}
+      {% elif slot.type.value == 'button' %}
+        {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
+          {% include "components/slot_types/button_slot.html" %}
+          {% include "components/slot_position_editor.html" %}
+        {% endwith %}
+      {% elif slot.type.value == 'image_or_text' %}
+        {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
+          {% include "components/slot_types/image_or_text_slot.html" %}
+          {% include "components/slot_position_editor.html" %}
+        {% endwith %}
+      {% endif %}
+    </div>
   </div>
   {% endfor %}
 </div>

@@ -43,6 +43,7 @@ class SvgRenderer:
             raise GenerationError(f"SVG rendering failed: {exc}") from exc
 
     def _render_background(self, svg: ET.Element, design: TemplateDesign, w: int, h: int) -> None:
+        bg_group = ET.SubElement(svg, "g", attrib={"id": "Background", "data-name": "Background"})
         bg_type = (design.background_type or "").lower()
         bg_value = design.background_value or design.primary_color
 
@@ -53,17 +54,17 @@ class SvgRenderer:
                                      attrib={"id": "bg-grad", "x1": "0%", "y1": "0%", "x2": "100%", "y2": "100%"})
                 ET.SubElement(grad, "stop", attrib={"offset": "0%", "stop-color": parts[0]})
                 ET.SubElement(grad, "stop", attrib={"offset": "100%", "stop-color": parts[1]})
-                ET.SubElement(svg, "rect", attrib={"x": "0", "y": "0", "width": str(w), "height": str(h), "fill": "url(#bg-grad)"})
+                ET.SubElement(bg_group, "rect", attrib={"x": "0", "y": "0", "width": str(w), "height": str(h), "fill": "url(#bg-grad)"})
             else:
-                ET.SubElement(svg, "rect", attrib={"x": "0", "y": "0", "width": str(w), "height": str(h), "fill": parts[0]})
+                ET.SubElement(bg_group, "rect", attrib={"x": "0", "y": "0", "width": str(w), "height": str(h), "fill": parts[0]})
         elif bg_type == "image" and bg_value:
-            ET.SubElement(svg, "image", attrib={
+            ET.SubElement(bg_group, "image", attrib={
                 "href": bg_value, "x": "0", "y": "0",
                 "width": str(w), "height": str(h), "preserveAspectRatio": "xMidYMid slice",
             })
         else:
             fill = bg_value if bg_value else "#ffffff"
-            ET.SubElement(svg, "rect", attrib={"x": "0", "y": "0", "width": str(w), "height": str(h), "fill": fill})
+            ET.SubElement(bg_group, "rect", attrib={"x": "0", "y": "0", "width": str(w), "height": str(h), "fill": fill})
 
     @staticmethod
     def _effective_geometry(slot: Slot, value: Any) -> tuple[float, float, float, float]:
@@ -79,29 +80,41 @@ class SvgRenderer:
     def _render_slot(self, svg: ET.Element, slot: Slot, value: Any, template: BannerTemplate) -> None:
         w, h = template.meta.width, template.meta.height
 
+        x_pct, y_pct, w_pct, h_pct = self._effective_geometry(slot, value)
+        slot_group = ET.SubElement(svg, "g", attrib={
+            "id": slot.id,
+            "data-name": slot.id,
+            "class": "draggable-slot",
+            "data-slot-id": slot.id,
+            "data-slot-type": slot.type.value,
+            "data-x": f"{x_pct:.4f}",
+            "data-y": f"{y_pct:.4f}",
+            "data-w": f"{w_pct:.4f}",
+            "data-h": f"{h_pct:.4f}",
+        })
         normalised = self._normalise_value(slot, value)
 
         # Check for AI prompt with no image yet
         prompt_text = self._extract_prompt(value)
         if prompt_text and not self._has_image_url(value) and (normalised is None or normalised == ""):
-            self._render_prompt_placeholder(svg, slot, value, prompt_text, w, h)
+            self._render_prompt_placeholder(slot_group, slot, value, prompt_text, w, h)
             return
 
         if normalised is None or normalised == "":
-            self._render_placeholder(svg, slot, value, w, h)
+            self._render_placeholder(slot_group, slot, value, w, h)
             return
 
         if slot.type in (SlotType.TEXT, SlotType.IMAGE_OR_TEXT):
             if slot.type == SlotType.IMAGE_OR_TEXT and isinstance(value, dict) and value.get("slot_type") == "image":
-                self._render_image_slot(svg, slot, value, normalised, w, h)
+                self._render_image_slot(slot_group, slot, value, normalised, w, h)
             else:
-                self._render_text_slot(svg, slot, value, normalised, w, h)
+                self._render_text_slot(slot_group, slot, value, normalised, w, h)
         elif slot.type == SlotType.IMAGE:
-            self._render_image_slot(svg, slot, value, normalised, w, h)
+            self._render_image_slot(slot_group, slot, value, normalised, w, h)
         elif slot.type == SlotType.BUTTON:
-            self._render_button_slot(svg, slot, value, normalised, w, h)
+            self._render_button_slot(slot_group, slot, value, normalised, w, h)
         else:
-            self._render_text_slot(svg, slot, value, str(normalised), w, h)
+            self._render_text_slot(slot_group, slot, value, str(normalised), w, h)
 
     @staticmethod
     def _normalise_value(slot: Slot, value: Any) -> Any:
@@ -147,6 +160,7 @@ class SvgRenderer:
             "font-weight": font_weight,
             "fill": color,
             "text-anchor": "middle", "dominant-baseline": "central",
+            "data-content": "true",
         })
         text_elem.text = str(value)
 
@@ -198,6 +212,7 @@ class SvgRenderer:
             "font-family": _DEFAULT_FONT_FAMILY,
             "font-size": font_size_num, "font-weight": "bold",
             "fill": text_color, "text-anchor": "middle", "dominant-baseline": "central",
+            "data-content": "true",
         })
         text_elem.text = label if label else "Button"
 
@@ -211,7 +226,12 @@ class SvgRenderer:
             "fill": "none", "stroke": "#cccccc", "stroke-width": "1", "stroke-dasharray": "5,5",
         })
 
-        label = slot.description or f"{slot.type.value}: {slot.id}"
+        # Always use a generic structural label — never slot.description or
+        # slot.default_label, which contain template-specific dummy copy.
+        # NanoBanana Pro reads the reference image during the i2i pass; showing
+        # "Blue Pen Sale!" on a Ramen banner would poison the AI's output.
+        _generic = {"text": "Text Here", "button": "Button", "image": "Image", "image_or_text": "Content Here"}
+        label = _generic.get(slot.type.value, f"{slot.type.value}")
         text_elem = ET.SubElement(svg, "text", attrib={
             "x": f"{x + sw / 2:.1f}", "y": f"{y + sh / 2:.1f}",
             "font-family": _DEFAULT_FONT_FAMILY,

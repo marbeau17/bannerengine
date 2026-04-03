@@ -181,6 +181,52 @@ async def update_slot(request: Request, pattern_id: str, slot_id: str):
     )
 
 
+@router.patch("/{pattern_id}/{slot_id}/position", response_class=HTMLResponse)
+async def update_slot_position(request: Request, pattern_id: str, slot_id: str):
+    """Silently update position and/or size of a slot (drag-and-drop / resize sync).
+
+    Accepts any combination of percentage-based x, y, width, height fields,
+    saves them to the session, and returns a re-rendered preview canvas partial.
+    At least one field must be provided.
+    """
+    template_service = request.app.state.template_service
+    svg_renderer = request.app.state.svg_renderer
+    template = template_service.get_template(pattern_id)
+
+    form_data = await request.form()
+    fields = {k: form_data.get(k) for k in ("x", "y", "width", "height")}
+    provided = {k: v for k, v in fields.items() if v is not None}
+
+    if not provided:
+        raise ValidationError(message="At least one of x, y, width, height is required.", errors=["No fields provided"])
+
+    try:
+        parsed = {k: str(round(float(v), 4)) for k, v in provided.items()}
+    except (ValueError, TypeError):
+        raise ValidationError(message="All geometry fields must be numeric.", errors=["Invalid value"])
+
+    session_slots = _get_session_slots(request, pattern_id)
+    existing = session_slots.get(slot_id, {})
+    if not isinstance(existing, dict):
+        existing = {}
+    existing.update(parsed)
+    session_slots[slot_id] = existing
+    _set_session_slots(request, pattern_id, session_slots)
+
+    effective_template = template
+    design_overrides = session_slots.get("_design")
+    if isinstance(design_overrides, dict) and design_overrides.get("background_value"):
+        effective_template = template.model_copy(deep=True)
+        effective_template.design.background_value = design_overrides["background_value"]
+
+    svg_markup = svg_renderer.render(effective_template, session_slots)
+    return templates.TemplateResponse(
+        request,
+        "partials/preview_canvas.html",
+        {"template": effective_template, "pattern_id": pattern_id, "svg_markup": svg_markup},
+    )
+
+
 @router.put("/{pattern_id}")
 async def save_all_slots(request: Request, pattern_id: str):
     """Save all slot values at once (JSON body).

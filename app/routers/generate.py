@@ -168,8 +168,8 @@ def _svg_to_png(svg_string: str, width: int, height: int) -> bytes:
     return _pillow_svg_render(svg_string, width, height)
 
 
-__SVG_NS = "http://www.w3.org/2000/svg"
-__XLINK_NS = "http://www.w3.org/1999/xlink"
+_SVG_NS = "http://www.w3.org/2000/svg"
+_XLINK_NS = "http://www.w3.org/1999/xlink"
 
 # Font search paths (macOS, Linux)
 _FONT_PATHS = [
@@ -251,6 +251,9 @@ def _pillow_svg_render(svg_string: str, width: int, height: int) -> bytes:
     clip-path clipping and preserveAspectRatio="xMidYMid slice" for images.
     """
     from PIL import Image, ImageDraw
+
+    img = Image.new("RGBA", (width, height), (255, 255, 255, 255))
+    draw = ImageDraw.Draw(img)
 
     try:
         root = ET.fromstring(svg_string)
@@ -452,9 +455,12 @@ async def start_ai_generation(request: Request, pattern_id: str):
     nano_client = request.app.state.nano_banana_client
     template = template_service.get_template(pattern_id)
 
-    # Parse optional creative direction from form data
+    # Parse optional creative direction and tab mode from form data
     form = await request.form()
     creative_direction = str(form.get("creative_direction", "") or "").strip() or None
+    mode = str(form.get("mode", "manual") or "manual").strip()
+    if mode not in ("manual", "ai"):
+        mode = "manual"
 
     slot_values = request.session.get(f"slots_{pattern_id}", {})
 
@@ -493,7 +499,7 @@ async def start_ai_generation(request: Request, pattern_id: str):
 
     asyncio.create_task(_render_ai_banner(
         job_id, svg_string, template.meta.width, template.meta.height,
-        render_instruction, nano_client, creative_direction, custom_ref_bytes,
+        render_instruction, nano_client, creative_direction, custom_ref_bytes, mode,
     ))
 
     return templates.TemplateResponse(
@@ -506,7 +512,7 @@ async def start_ai_generation(request: Request, pattern_id: str):
 async def _render_ai_banner(
     job_id: str, svg_string: str, width: int, height: int,
     render_instruction, nano_client, creative_direction: str | None = None,
-    custom_ref_bytes: bytes | None = None,
+    custom_ref_bytes: bytes | None = None, mode: str = "manual",
 ) -> None:
     """Render SVG to PNG as reference, then send to AI for enhancement."""
     job = _jobs[job_id]
@@ -528,6 +534,7 @@ async def _render_ai_banner(
             reference_image_bytes=reference_bytes,
             instruction=render_instruction.model_dump(),
             user_prompt=creative_direction,
+            mode=mode,
         )
 
         # Step 3: Poll AI generation
@@ -564,150 +571,6 @@ async def _render_ai_banner(
         job["progress"] = 0
 
 
-@router.get("/psd/{pattern_id}")
-async def export_psd(request: Request, pattern_id: str):
-    """Export the current banner as a layered PSD file."""
-    from fastapi.responses import Response
-    from psd_tools import PSDImage
-    from psd_tools.api.layers import PixelLayer
-    from PIL import Image, ImageDraw, ImageFont
-
-    template_service = request.app.state.template_service
-    template = template_service.get_template(pattern_id)
-    slot_values = request.session.get(f"slots_{pattern_id}", {})
-
-    w, h = template.meta.width, template.meta.height
-    psd = PSDImage.new("RGBA", (w, h))
-
-    # Background layer
-    design = slot_values.get("_design", {})
-    bg_color = (design.get("background_value") if isinstance(design, dict) else None) or template.design.background_value or "#FFFFFF"
-    bg_rgba = _hex_to_rgba(bg_color)
-    bg_img = Image.new("RGBA", (w, h), bg_rgba)
-    PixelLayer.frompil(bg_img, psd, name="Background", top=0, left=0)
-
-    # Find a font
-    font_cache = {}
-    def get_font(size, bold=False):
-        key = (int(size), bold)
-        if key in font_cache:
-            return font_cache[key]
-        paths = _BOLD_FONT_PATHS if bold else _FONT_PATHS
-        for fp in list(paths) + list(_FONT_PATHS):
-            try:
-                f = ImageFont.truetype(fp, max(int(size), 8))
-                font_cache[key] = f
-                return f
-            except (OSError, IOError):
-                continue
-        f = ImageFont.load_default()
-        font_cache[key] = f
-        return f
-
-    from app.core.svg_renderer import SvgRenderer
-    renderer = SvgRenderer()
-
-    # Create a layer for each slot
-    for slot in template.slots:
-        val = slot_values.get(slot.id)
-        if val is None:
-            continue
-
-        # Get effective geometry
-        sx, sy, sw, sh = renderer._effective_geometry(slot, val)
-        px_x = int(sx / 100.0 * w)
-        px_y = int(sy / 100.0 * h)
-        px_w = max(int(sw / 100.0 * w), 1)
-        px_h = max(int(sh / 100.0 * h), 1)
-
-        normalised = renderer._normalise_value(slot, val)
-        if not normalised and normalised != 0:
-            continue
-
-        if slot.type.value in ("text", "image_or_text"):
-            # Render text to transparent image
-            text = str(normalised)
-            if not text.strip():
-                continue
-
-            fs_str = (val.get("font_size") if isinstance(val, dict) else None) or slot.font_size_guideline or "16"
-            fs = int("".join(c for c in str(fs_str) if c.isdigit()) or "16")
-            fw = (val.get("font_weight") if isinstance(val, dict) else None) or slot.font_weight or "normal"
-            color = (val.get("color") if isinstance(val, dict) else None) or slot.color or "#000000"
-            color_rgba = _hex_to_rgba(color)
-
-            font = get_font(fs, bold=(fw == "bold"))
-            text_img = Image.new("RGBA", (px_w, px_h), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(text_img)
-            bbox = draw.textbbox((0, 0), text, font=font)
-            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-            tx = (px_w - tw) / 2
-            ty = (px_h - th) / 2
-            draw.text((tx, ty), text, fill=color_rgba, font=font)
-
-            layer_name = f"Text: {slot.id} [{fs}px {fw} {color}]: {text[:30]}"
-            PixelLayer.frompil(text_img, psd, name=layer_name, top=px_y, left=px_x)
-
-        elif slot.type.value == "image":
-            # Load the image file
-            src = val.get("source_url", "") if isinstance(val, dict) else str(val)
-            if not src:
-                continue
-            local_path = src.lstrip("/")
-            if not os.path.isfile(local_path):
-                continue
-            try:
-                img = Image.open(local_path).convert("RGBA")
-                # Resize to slot dimensions (cover fit)
-                src_w, src_h = img.size
-                scale = max(px_w / src_w, px_h / src_h)
-                scaled = img.resize((int(src_w * scale), int(src_h * scale)), Image.LANCZOS)
-                # Center crop
-                cx = (scaled.width - px_w) // 2
-                cy = (scaled.height - px_h) // 2
-                cropped = scaled.crop((cx, cy, cx + px_w, cy + px_h))
-                PixelLayer.frompil(cropped, psd, name=f"Image: {slot.id} [{px_w}x{px_h}px]", top=px_y, left=px_x)
-            except Exception:
-                continue
-
-        elif slot.type.value == "button":
-            # Button background + text as separate layers
-            if isinstance(val, dict):
-                label = val.get("label", val.get("text", ""))
-                bg = val.get("bg_color") or slot.bg_color or "#333333"
-                tc = val.get("text_color") or slot.text_color or "#ffffff"
-            else:
-                label = str(val)
-                bg = slot.bg_color or "#333333"
-                tc = slot.text_color or "#ffffff"
-            if not label and slot.default_label:
-                label = slot.default_label
-
-            # Button background layer
-            btn_bg = Image.new("RGBA", (px_w, px_h), _hex_to_rgba(bg))
-            PixelLayer.frompil(btn_bg, psd, name=f"Button BG: {slot.id} [{bg}]", top=px_y, left=px_x)
-
-            # Button text layer
-            fs_str = (val.get("font_size") if isinstance(val, dict) else None) or slot.font_size_guideline or "14"
-            fs = int("".join(c for c in str(fs_str) if c.isdigit()) or "14")
-            font = get_font(fs, bold=True)
-            btn_text = Image.new("RGBA", (px_w, px_h), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(btn_text)
-            bbox = draw.textbbox((0, 0), label or "Button", font=font)
-            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-            draw.text(((px_w - tw) / 2, (px_h - th) / 2), label or "Button", fill=_hex_to_rgba(tc), font=font)
-            btn_layer_name = f"Button Text: {slot.id} [{fs}px bold {tc}]: {(label or 'Button')[:30]}"
-            PixelLayer.frompil(btn_text, psd, name=btn_layer_name, top=px_y, left=px_x)
-
-    buf = io.BytesIO()
-    psd.save(buf)
-    buf.seek(0)
-
-    return Response(
-        content=buf.getvalue(),
-        media_type="application/x-photoshop",
-        headers={"Content-Disposition": f'attachment; filename="{pattern_id}.psd"'},
-    )
 
 
 def _hex_to_rgba(hex_color: str) -> tuple[int, int, int, int]:

@@ -95,6 +95,12 @@ try:
 except (ImportError, AttributeError) as exc:
     logger.warning("Could not import custom router: %s", exc)
 
+try:
+    from app.routers import ai_generation
+    _routers.append(ai_generation.router)
+except (ImportError, AttributeError) as exc:
+    logger.warning("Could not import ai_generation router: %s", exc)
+
 
 # ---------------------------------------------------------------------------
 # Startup / shutdown logic

@@ -93,27 +93,151 @@
     </div>
   </div>
 
-  <!-- Right panel: slot editors -->
-  <aside class="w-80 flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 overflow-y-auto">
-    <div class="p-4">
-      <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">スロット編集</h3>
+  <!-- Right panel: tabbed slot editor / AI generation -->
+  <aside class="w-80 flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
+
+    <!-- Tab headers -->
+    <div class="flex border-b border-gray-200 px-4 pt-3 flex-shrink-0">
+      <button
+        id="tab-manual-btn"
+        onclick="switchEditorTab('manual')"
+        class="px-3 py-2 text-xs font-semibold border-b-2 border-indigo-600 text-indigo-600 -mb-px transition-colors"
+      >スロット編集</button>
+      <button
+        id="tab-ai-btn"
+        onclick="switchEditorTab('ai')"
+        class="px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px transition-colors flex items-center gap-1"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+        </svg>
+        AI生成
+      </button>
+    </div>
+
+    <!-- Manual edit tab panel -->
+    <div id="panel-manual" class="flex-1 overflow-y-auto p-4">
       <div id="slot-editor-panel">
         {% include "partials/slot_editor.html" %}
       </div>
     </div>
 
-    <!-- Generate button -->
-    <div class="sticky bottom-0 bg-white border-t border-gray-200 p-4">
-      <button
-        class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-        hx-post="/api/generate/{{ pattern_id }}"
-        hx-target="#generate-result"
-        hx-indicator="#generate-spinner"
-      >
-        バナーを生成
-      </button>
-      <details class="mt-2">
-        <summary class="w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-semibold rounded-lg shadow cursor-pointer text-center list-none">
+    <!-- AI generation tab panel -->
+    <div id="panel-ai" class="hidden flex-1 overflow-y-auto p-4">
+      <p class="text-[11px] text-gray-400 mb-3">各スロットにプロンプトを入力して個別生成、またはまとめてAIで仕上げます。</p>
+
+      {% for slot in slots %}
+      <div id="ai-slot-container-{{ slot.id }}" data-locked="false" class="border border-gray-200 rounded-lg p-3 mb-2">
+        <div class="flex items-center gap-2 mb-1.5">
+          {% if slot.type.value == 'text' %}
+          <span class="w-5 h-5 flex items-center justify-center rounded bg-blue-100 text-blue-600 text-[10px] font-bold flex-shrink-0">T</span>
+          {% elif slot.type.value == 'image' %}
+          <span class="w-5 h-5 flex items-center justify-center rounded bg-green-100 text-green-600 text-[10px] font-bold flex-shrink-0">I</span>
+          {% elif slot.type.value == 'button' %}
+          <span class="w-5 h-5 flex items-center justify-center rounded bg-orange-100 text-orange-600 text-[10px] font-bold flex-shrink-0">B</span>
+          {% elif slot.type.value == 'image_or_text' %}
+          <span class="w-5 h-5 flex items-center justify-center rounded bg-purple-100 text-purple-600 text-[10px] font-bold flex-shrink-0">IT</span>
+          {% endif %}
+          <span class="text-xs font-semibold text-gray-700 flex-1 truncate">{{ slot.id }}</span>
+          {% if slot.required %}
+          <span class="text-[10px] font-semibold uppercase bg-red-100 text-red-600 px-1.5 py-0.5 rounded flex-shrink-0">必須</span>
+          {% else %}
+          <span class="text-[10px] font-semibold uppercase bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded flex-shrink-0">任意</span>
+          {% endif %}
+        </div>
+
+        {% if slot.description %}
+        <p class="text-[11px] text-gray-400 mb-1.5">{{ slot.description }}</p>
+        {% endif %}
+
+        <!-- Input row (prompt mode) -->
+        <div id="ai-slot-input-row-{{ slot.id }}" class="flex gap-1.5">
+          <textarea
+            id="ai-prompt-{{ slot.id }}"
+            rows="2"
+            placeholder="{{ slot.prompt_placeholder or 'プロンプトを入力...' }}"
+            class="flex-1 text-xs border border-gray-300 rounded-md px-2 py-1.5 resize-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+          ></textarea>
+          <button
+            type="button"
+            onclick="generateSlot('{{ pattern_id }}', '{{ slot.id }}', '{{ slot.type.value }}')"
+            class="self-start px-2 py-1.5 text-[11px] bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-md font-semibold whitespace-nowrap transition-colors"
+          >生成</button>
+        </div>
+
+        <!-- Generated state (shown after successful individual generation) -->
+        <div id="ai-slot-generated-{{ slot.id }}" class="hidden mt-1.5">
+          <div class="bg-gray-50 border border-gray-200 rounded-md p-2 flex items-start gap-2">
+            <span id="ai-slot-generated-display-{{ slot.id }}" class="flex-1 text-xs text-gray-600 break-words leading-relaxed"></span>
+            <button
+              type="button"
+              onclick="resetSlotToPromptMode('{{ slot.id }}')"
+              class="text-[11px] text-indigo-500 hover:text-indigo-700 font-medium whitespace-nowrap shrink-0 mt-0.5"
+            >編集</button>
+          </div>
+        </div>
+
+        <div id="ai-slot-result-{{ slot.id }}" class="mt-1.5 hidden"></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Sticky bottom: action buttons -->
+    <div class="flex-shrink-0 bg-white border-t border-gray-200 p-4">
+
+      <!-- Manual tab actions -->
+      <div id="bottom-manual">
+        <button
+          class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          hx-post="/api/generate/{{ pattern_id }}"
+          hx-target="#generate-result"
+          hx-indicator="#generate-spinner"
+        >
+          バナーを生成
+        </button>
+        <details class="mt-2">
+          <summary class="w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-semibold rounded-lg shadow cursor-pointer text-center list-none">
+            <span class="flex items-center justify-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+              </svg>
+              AIで仕上げる
+            </span>
+          </summary>
+          <div class="mt-2 space-y-2">
+            <textarea
+              id="ai-creative-direction"
+              name="creative_direction"
+              rows="2"
+              placeholder="例: モダンな雰囲気で、暖色系を使って、ミニマルなスタイルで..."
+              class="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+            ></textarea>
+            <button
+              type="button"
+              class="w-full py-2 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition-colors"
+              onclick="startAiGeneration('{{ pattern_id }}')"
+            >
+              生成する
+            </button>
+          </div>
+        </details>
+      </div>
+
+      <!-- AI tab actions -->
+      <div id="bottom-ai" class="hidden space-y-2">
+        <textarea
+          id="ai-global-prompt"
+          rows="2"
+          placeholder="全体のクリエイティブ方向性... (例: モダン、暖色系、ミニマル)"
+          class="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+        ></textarea>
+        <button
+          type="button"
+          onclick="startAiBlend('{{ pattern_id }}')"
+          class="w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-sm font-semibold rounded-lg shadow transition-colors"
+        >
           <span class="flex items-center justify-center gap-1.5">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -121,24 +245,9 @@
             </svg>
             AIで仕上げる
           </span>
-        </summary>
-        <div class="mt-2 space-y-2">
-          <textarea
-            id="ai-creative-direction"
-            name="creative_direction"
-            rows="2"
-            placeholder="例: モダンな雰囲気で、暖色系を使って、ミニマルなスタイルで..."
-            class="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
-          ></textarea>
-          <button
-            type="button"
-            class="w-full py-2 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition-colors"
-            onclick="startAiGeneration('{{ pattern_id }}')"
-          >
-            生成する
-          </button>
-        </div>
-      </details>
+        </button>
+      </div>
+
       <div id="generate-spinner" class="htmx-indicator text-center mt-2">
         <svg class="animate-spin h-5 w-5 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -152,10 +261,309 @@
 </div>
 
 <script>
+  // ---------------------------------------------------------------------------
+  // Tab switching
+  // ---------------------------------------------------------------------------
+  function switchEditorTab(tab) {
+    var isAi = tab === 'ai';
+
+    document.getElementById('panel-manual').classList.toggle('hidden', isAi);
+    document.getElementById('panel-ai').classList.toggle('hidden', !isAi);
+    document.getElementById('bottom-manual').classList.toggle('hidden', isAi);
+    document.getElementById('bottom-ai').classList.toggle('hidden', !isAi);
+
+    var manualBtn = document.getElementById('tab-manual-btn');
+    var aiBtn = document.getElementById('tab-ai-btn');
+
+    if (isAi) {
+      manualBtn.className = 'px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px transition-colors';
+      aiBtn.className = 'px-3 py-2 text-xs font-semibold border-b-2 border-purple-600 text-purple-600 -mb-px transition-colors flex items-center gap-1';
+      if (typeof syncAllTextToAiTab !== 'undefined') syncAllTextToAiTab();
+    } else {
+      manualBtn.className = 'px-3 py-2 text-xs font-semibold border-b-2 border-indigo-600 text-indigo-600 -mb-px transition-colors';
+      aiBtn.className = 'px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px transition-colors flex items-center gap-1';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Slot UI state helpers: prompt mode ↔ generated/locked mode
+  // ---------------------------------------------------------------------------
+  function setSlotGeneratedState(slotId, displayText) {
+    // --- AI tab ---
+    var container = document.getElementById('ai-slot-container-' + slotId);
+    var inputRow = document.getElementById('ai-slot-input-row-' + slotId);
+    var generatedDiv = document.getElementById('ai-slot-generated-' + slotId);
+    var displayEl = document.getElementById('ai-slot-generated-display-' + slotId);
+    var resultDiv = document.getElementById('ai-slot-result-' + slotId);
+
+    if (container) {
+      container.dataset.locked = 'true';
+      container.dataset.generatedText = displayText;
+    }
+    if (displayEl) displayEl.textContent = displayText;
+    if (inputRow) inputRow.classList.add('hidden');
+    if (generatedDiv) generatedDiv.classList.remove('hidden');
+    if (resultDiv) resultDiv.classList.add('hidden');
+
+    // --- Manual tab mirror ---
+    if (typeof setManualTabLocked === 'function') setManualTabLocked(slotId, displayText);
+
+    // --- SVG canvas group: disable inline text editing ---
+    var canvas = document.getElementById('preview-canvas');
+    if (canvas) {
+      var svg = canvas.querySelector('svg');
+      if (svg) {
+        var group = svg.querySelector('g[data-slot-id="' + slotId + '"]');
+        if (group) group.dataset.locked = 'true';
+      }
+    }
+  }
+
+  function setSlotGeneratedImageState(slotId, imageUrl) {
+    // --- AI tab ---
+    var container = document.getElementById('ai-slot-container-' + slotId);
+    var inputRow = document.getElementById('ai-slot-input-row-' + slotId);
+    var generatedDiv = document.getElementById('ai-slot-generated-' + slotId);
+    var displayEl = document.getElementById('ai-slot-generated-display-' + slotId);
+    var resultDiv = document.getElementById('ai-slot-result-' + slotId);
+
+    if (container) {
+      container.dataset.locked = 'true';
+      container.dataset.generatedImageUrl = imageUrl;
+    }
+    if (displayEl) {
+      displayEl.innerHTML = '<img src="' + imageUrl + '" alt="生成画像" class="w-full rounded border border-gray-200">';
+    }
+    if (inputRow) inputRow.classList.add('hidden');
+    if (generatedDiv) generatedDiv.classList.remove('hidden');
+    if (resultDiv) resultDiv.classList.add('hidden');
+
+    // --- Manual tab mirror (show thumbnail label) ---
+    if (typeof setManualTabLocked === 'function') setManualTabLocked(slotId, 'AI生成画像 ✓');
+
+    // --- SVG canvas group: image slots are not text-editable, but mark anyway ---
+    var canvas = document.getElementById('preview-canvas');
+    if (canvas) {
+      var svg = canvas.querySelector('svg');
+      if (svg) {
+        var group = svg.querySelector('g[data-slot-id="' + slotId + '"]');
+        if (group) group.dataset.locked = 'true';
+      }
+    }
+  }
+
+  function resetSlotToPromptMode(slotId) {
+    // --- AI tab ---
+    var container = document.getElementById('ai-slot-container-' + slotId);
+    var inputRow = document.getElementById('ai-slot-input-row-' + slotId);
+    var generatedDiv = document.getElementById('ai-slot-generated-' + slotId);
+
+    if (container) {
+      container.dataset.locked = 'false';
+      delete container.dataset.generatedText;
+      delete container.dataset.generatedImageUrl;
+    }
+    if (inputRow) inputRow.classList.remove('hidden');
+    if (generatedDiv) generatedDiv.classList.add('hidden');
+
+    // --- Manual tab mirror ---
+    if (typeof resetManualTabToEdit === 'function') resetManualTabToEdit(slotId);
+
+    // --- SVG canvas group: re-enable inline text editing ---
+    var canvas = document.getElementById('preview-canvas');
+    if (canvas) {
+      var svg = canvas.querySelector('svg');
+      if (svg) {
+        var group = svg.querySelector('g[data-slot-id="' + slotId + '"]');
+        if (group) group.dataset.locked = 'false';
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Per-slot AI generation (AI tab)
+  // ---------------------------------------------------------------------------
+  async function generateSlot(patternId, slotId, slotType) {
+    var promptEl = document.getElementById('ai-prompt-' + slotId);
+    var prompt = promptEl.value.trim();
+    if (!prompt) {
+      promptEl.focus();
+      return;
+    }
+
+    var resultDiv = document.getElementById('ai-slot-result-' + slotId);
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = '<p class="text-[11px] text-purple-500 animate-pulse">生成中...</p>';
+
+    var formData = new FormData();
+    formData.append('prompt', prompt);
+
+    try {
+      if (slotType === 'image' || slotType === 'image_or_text') {
+        var resp = await fetch('/api/image-generate/' + patternId + '/' + slotId, {
+          method: 'POST',
+          body: formData
+        });
+        if (!resp.ok) throw new Error('Generation request failed');
+        var data = await resp.json();
+        pollSlotImage(patternId, slotId, data.job_id, resultDiv);
+      } else {
+        // Text / button generation
+        var resp = await fetch('/api/ai-generation/generate-slot-text/' + patternId + '/' + slotId, {
+          method: 'POST',
+          body: formData
+        });
+        if (!resp.ok) throw new Error('Text generation failed');
+        var data = await resp.json();
+        if (data.text) {
+          // Save generated text to slot and refresh preview
+          var patchForm = new FormData();
+          patchForm.append('content', data.text);
+          patchForm.append('slot_type', slotType === 'button' ? 'button' : 'text');
+          var patchResp = await fetch('/api/slots/' + patternId + '/' + slotId, {
+            method: 'PATCH',
+            body: patchForm
+          });
+          var canvasHtml = await patchResp.text();
+          var canvasEl = document.getElementById('preview-canvas');
+          if (canvasEl) {
+            canvasEl.outerHTML = canvasHtml;
+            htmx.process(document.body);
+            setTimeout(function() {
+              if (typeof initCanvasInteractions === 'function') initCanvasInteractions();
+            }, 50);
+          }
+          // Lock the slot into generated state
+          setSlotGeneratedState(slotId, data.text);
+        } else {
+          resultDiv.innerHTML = '<p class="text-[11px] text-red-500">生成失敗</p>';
+        }
+      }
+    } catch (e) {
+      resultDiv.innerHTML = '<p class="text-[11px] text-red-500">エラー: ' + e.message + '</p>';
+    }
+  }
+
+  function pollSlotImage(patternId, slotId, jobId, resultDiv) {
+    var evtSource = new EventSource('/api/image-generate/status/' + jobId);
+    evtSource.onmessage = function(e) {
+      var data = JSON.parse(e.data);
+      if (data.status === 'completed' && data.image_url) {
+        evtSource.close();
+        var applyForm = new FormData();
+        applyForm.append('image_url', data.image_url);
+        applyForm.append('prompt', document.getElementById('ai-prompt-' + slotId).value);
+        fetch('/api/image-generate/apply/' + patternId + '/' + slotId, {
+          method: 'POST',
+          body: applyForm
+        })
+          .then(function(r) { return r.text(); })
+          .then(function(html) {
+            var canvasEl = document.getElementById('preview-canvas');
+            if (canvasEl) {
+              canvasEl.outerHTML = html;
+              htmx.process(document.body);
+              setTimeout(function() {
+                if (typeof initCanvasInteractions === 'function') initCanvasInteractions();
+              }, 50);
+            }
+            // Lock the slot into generated image state
+            setSlotGeneratedImageState(slotId, data.image_url);
+          });
+      } else if (data.status === 'failed') {
+        evtSource.close();
+        resultDiv.innerHTML = '<p class="text-[11px] text-red-500">生成失敗: ' + (data.error || '') + '</p>';
+      } else {
+        resultDiv.innerHTML = '<p class="text-[11px] text-purple-500 animate-pulse">生成中 ' + (data.progress || 0) + '%...</p>';
+      }
+    };
+    evtSource.onerror = function() {
+      evtSource.close();
+      resultDiv.innerHTML = '<p class="text-[11px] text-red-500">接続エラー</p>';
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // AI tab master button: auto-fill blanks + blend
+  // ---------------------------------------------------------------------------
+  async function startAiBlend(patternId) {
+    var globalPrompt = document.getElementById('ai-global-prompt').value.trim();
+    var formData = new FormData();
+    if (globalPrompt) formData.append('global_prompt', globalPrompt);
+
+    // Collect slot states for pre-flight logic
+    var svgCanvas = (function() {
+      var c = document.getElementById('preview-canvas');
+      return c ? c.querySelector('svg') : null;
+    })();
+
+    document.querySelectorAll('[id^="ai-slot-container-"]').forEach(function(container) {
+      var slotId = container.id.replace('ai-slot-container-', '');
+      var isLocked = container.dataset.locked === 'true';
+      if (isLocked) {
+        // Case A: finalized — send locked text so backend keeps it as-is
+        var text = container.dataset.generatedText || '';
+        if (text) formData.append('locked_' + slotId, text);
+        // Image slots: URL already in session — just mark as locked
+        var imageUrl = container.dataset.generatedImageUrl || '';
+        if (imageUrl) formData.append('locked_image_' + slotId, imageUrl);
+      } else {
+        // Case B: user typed a prompt guideline but did not generate yet.
+        // Aggressively collect from multiple sources so no user intent is lost.
+        var guidelineText = '';
+
+        // Source 1: AI tab prompt textarea
+        var promptEl = document.getElementById('ai-prompt-' + slotId);
+        if (promptEl && promptEl.value.trim()) {
+          guidelineText = promptEl.value.trim();
+        }
+
+        // Source 2 (fallback): live canvas SVG text content — catches text the
+        // user typed directly on the canvas or via the スロット編集 tab without
+        // explicitly switching to the AI tab first.
+        if (!guidelineText && svgCanvas) {
+          var group = svgCanvas.querySelector('g[data-slot-id="' + slotId + '"]');
+          if (group) {
+            var textEl = group.querySelector('text[data-content="true"]');
+            if (textEl && textEl.textContent.trim()) {
+              guidelineText = textEl.textContent.trim();
+            }
+          }
+        }
+
+        if (guidelineText) {
+          formData.append('prompt_' + slotId, guidelineText);
+        }
+        // Case C: completely blank — nothing sent; backend invents freely
+      }
+    });
+
+    document.getElementById('generate-result').innerHTML =
+      '<div class="space-y-2"><p class="text-xs font-medium text-purple-600 animate-pulse">AIパイプラインを開始中...</p>' +
+      '<div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-purple-600 h-2 rounded-full" style="width:5%"></div></div></div>';
+
+    try {
+      var resp = await fetch('/api/ai-generation/generate-remaining-and-blend/' + patternId, {
+        method: 'POST',
+        body: formData
+      });
+      var html = await resp.text();
+      document.getElementById('generate-result').innerHTML = html;
+      htmx.process(document.getElementById('generate-result'));
+    } catch (e) {
+      document.getElementById('generate-result').innerHTML =
+        '<p class="text-xs text-red-500">エラーが発生しました: ' + e.message + '</p>';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Existing: manual AI finish (スロット編集タブ)
+  // ---------------------------------------------------------------------------
   function startAiGeneration(patternId) {
     var direction = document.getElementById('ai-creative-direction').value.trim();
     var formData = new FormData();
     if (direction) formData.append('creative_direction', direction);
+    formData.append('mode', 'manual'); // Manual tab → strict: preserve exact text & layout
 
     fetch('/api/generate/ai/' + patternId, {method: 'POST', body: formData})
       .then(function(r) { return r.text(); })
@@ -165,7 +573,10 @@
       });
   }
 
-  let currentZoom = 100;
+  // ---------------------------------------------------------------------------
+  // Zoom controls
+  // ---------------------------------------------------------------------------
+  var currentZoom = 100;
 
   function adjustZoom(delta) {
     currentZoom = Math.max(10, Math.min(300, currentZoom + delta));
@@ -178,7 +589,7 @@
   }
 
   function applyZoom() {
-    const canvas = document.getElementById('preview-canvas');
+    var canvas = document.getElementById('preview-canvas');
     if (canvas) {
       canvas.style.transform = 'scale(' + (currentZoom / 100) + ')';
       canvas.style.transformOrigin = 'center center';

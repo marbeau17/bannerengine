@@ -274,8 +274,14 @@ Important:
         reference_image_bytes: bytes,
         instruction: dict,
         user_prompt: str | None = None,
+        mode: str = "manual",
     ) -> str:
-        """Generate a polished banner using a reference image + layout instructions."""
+        """Generate a polished banner using a reference image + layout instructions.
+
+        Args:
+            mode: ``"manual"`` — strict, preserve exact text and layout;
+                  ``"ai"`` — creative, use reference only as loose guidelines.
+        """
         job_id = str(uuid.uuid4())
         self._jobs[job_id] = {
             "status": "queued",
@@ -284,12 +290,13 @@ Important:
             "error": None,
         }
         asyncio.create_task(
-            self._generate_with_reference(job_id, reference_image_bytes, instruction, user_prompt)
+            self._generate_with_reference(job_id, reference_image_bytes, instruction, user_prompt, mode)
         )
         return job_id
 
     async def _generate_with_reference(
-        self, job_id: str, reference_image_bytes: bytes, instruction: dict, user_prompt: str | None
+        self, job_id: str, reference_image_bytes: bytes, instruction: dict,
+        user_prompt: str | None, mode: str = "manual",
     ) -> None:
         """Generate a polished banner from reference image + structured prompt."""
         job = self._jobs[job_id]
@@ -298,7 +305,7 @@ Important:
             job["progress"] = 10
 
             model = self._get_model()
-            text_prompt = self._build_ai_enhance_prompt(instruction, user_prompt)
+            text_prompt = self._build_ai_enhance_prompt(instruction, user_prompt, mode=mode)
 
             job["progress"] = 30
 
@@ -329,20 +336,43 @@ Important:
             job["progress"] = 0
 
     @staticmethod
-    def _build_ai_enhance_prompt(instruction: dict, user_prompt: str | None = None) -> str:
-        """Build a prompt for AI-enhanced banner generation from a reference image."""
+    def _build_ai_enhance_prompt(
+        instruction: dict,
+        user_prompt: str | None = None,
+        mode: str = "manual",
+    ) -> str:
+        """Build a prompt for AI-enhanced banner generation from a reference image.
+
+        Args:
+            mode: ``"manual"`` — strict mode (preserve exact text/layout);
+                  ``"ai"`` — creative mode (use reference as loose guidelines).
+        """
         canvas = instruction.get("canvas", {})
         layers = instruction.get("layers", [])
 
-        parts = [
-            "You are a professional banner designer. I'm providing a reference layout image "
-            "of a banner. Generate a polished, production-ready version of this banner.",
-            f"Canvas: {canvas.get('width', 1200)}x{canvas.get('height', 630)} pixels.",
-            f"Background: {canvas.get('background_color', '#FFFFFF')}.",
-            "Preserve the exact layout, text positions, and relative sizing from the reference.",
-            "Improve the visual quality: add subtle shadows, gradients, refined typography, "
-            "and professional polish while keeping all text content identical.",
-        ]
+        if mode == "ai":
+            # Creative mode: reference is a rough guideline only
+            parts = [
+                "You are a creative banner designer. I'm providing a rough reference layout.",
+                f"Canvas: {canvas.get('width', 1200)}x{canvas.get('height', 630)} pixels.",
+                f"Background: {canvas.get('background_color', '#FFFFFF')}.",
+                "Use the reference image and the text on the canvas ONLY as rough creative guidelines. "
+                "You are free to reimagine the layout, replace image subjects, rewrite or significantly "
+                "alter the text to better fit the overall creative direction. "
+                "Prioritise a visually striking, cohesive result over strict fidelity.",
+            ]
+        else:
+            # Manual mode: strict layout preservation
+            parts = [
+                "You are a professional banner designer. I'm providing a reference layout image "
+                "of a banner. Generate a polished, production-ready version of this banner.",
+                f"Canvas: {canvas.get('width', 1200)}x{canvas.get('height', 630)} pixels.",
+                f"Background: {canvas.get('background_color', '#FFFFFF')}.",
+                "Preserve the exact layout, text positions, and relative sizing from the reference. "
+                "Use the text EXACTLY as provided — do not change any words.",
+                "Improve only the visual quality: add subtle shadows, gradients, refined typography, "
+                "and professional polish while keeping all content identical.",
+            ]
 
         for layer in layers:
             layer_type = layer.get("type", "")
@@ -351,9 +381,10 @@ Important:
                 pos = layer.get("position", {})
                 size = layer.get("size", {})
                 if content:
+                    suffix = "— keep this exact text." if mode == "manual" else "— may be rewritten creatively."
                     parts.append(
                         f'Text: "{content}" at ({pos.get("x", 0)}, {pos.get("y", 0)}), '
-                        f'size {size.get("width", 0)}x{size.get("height", 0)}px — keep this exact text.'
+                        f'size {size.get("width", 0)}x{size.get("height", 0)}px {suffix}'
                     )
             elif layer_type == "image":
                 pos = layer.get("position", {})

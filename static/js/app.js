@@ -24,6 +24,82 @@ document.body.addEventListener("htmx:configRequest", function (event) {
    ========================================================================== */
 
 /**
+ * initCanvasInteractions()
+ * Single entry point that (re-)initialises every canvas module and syncs
+ * lock state. Call this whenever the preview canvas DOM is replaced.
+ */
+function initCanvasInteractions() {
+  CanvasDrag.init();
+  CanvasTextEdit.init();
+  CanvasSelect.init();
+  applyLockStates();
+  syncAllTextToAiTab();
+}
+
+/**
+ * applyLockStates()
+ * After a canvas re-render the fresh SVG groups lose their in-memory
+ * data-locked attribute. Re-apply it from the AI-tab container state so
+ * that CanvasTextEdit keeps honouring Rule B (locked → no inline edit).
+ */
+function applyLockStates() {
+  var canvas = document.getElementById("preview-canvas");
+  if (!canvas) return;
+  var svg = canvas.querySelector("svg");
+  if (!svg) return;
+  document.querySelectorAll("[id^='ai-slot-container-']").forEach(function (container) {
+    if (container.dataset.locked !== "true") return;
+    var slotId = container.id.replace("ai-slot-container-", "");
+    var group = svg.querySelector('g[data-slot-id="' + slotId + '"]');
+    if (group) group.dataset.locked = "true";
+  });
+}
+
+/* ==========================================================================
+   Cross-tab lock state helpers (manual slot-edit tab ↔ AI tab ↔ canvas)
+   ========================================================================== */
+
+/**
+ * setManualTabLocked(slotId, displayText)
+ * Hides the slot's editors in the スロット編集 tab and shows a read-only
+ * locked block with the generated text.
+ */
+function setManualTabLocked(slotId, displayText) {
+  var lockedDiv  = document.getElementById("manual-slot-locked-"   + slotId);
+  var lockedText = document.getElementById("manual-slot-locked-text-" + slotId);
+  var editorsDiv = document.getElementById("manual-slot-editors-"  + slotId);
+  if (lockedText) lockedText.textContent = displayText;
+  if (lockedDiv)  lockedDiv.classList.remove("hidden");
+  if (editorsDiv) editorsDiv.classList.add("hidden");
+}
+
+/**
+ * resetManualTabToEdit(slotId)
+ * Restores the slot's editors in the スロット編集 tab (inverse of setManualTabLocked).
+ */
+function resetManualTabToEdit(slotId) {
+  var lockedDiv  = document.getElementById("manual-slot-locked-"  + slotId);
+  var editorsDiv = document.getElementById("manual-slot-editors-" + slotId);
+  if (lockedDiv)  lockedDiv.classList.add("hidden");
+  if (editorsDiv) editorsDiv.classList.remove("hidden");
+}
+
+/**
+ * unlockSlot(slotId)
+ * Master unlock — called by the スロット編集 tab's "Edit" button.
+ * Resets both sidebar tabs and removes the canvas data-locked flag.
+ * Delegates to resetSlotToPromptMode (defined in editor.html) when available,
+ * which in turn calls resetManualTabToEdit — so no double-call needed here.
+ */
+function unlockSlot(slotId) {
+  if (typeof resetSlotToPromptMode === "function") {
+    resetSlotToPromptMode(slotId); // handles AI tab + manual tab + SVG group
+  } else {
+    resetManualTabToEdit(slotId);
+  }
+}
+
+/**
  * After every htmx swap, re-initialize dynamic components inside the
  * swapped fragment (e.g. char counters, drag-drop zones).
  */
@@ -36,6 +112,14 @@ document.body.addEventListener("htmx:afterSwap", function (event) {
   // Re-bind drag-drop zones inside the swapped region
   initDragDropZones(target);
 
+  // Re-attach canvas listeners and sync text when the preview is swapped
+  if (
+    target &&
+    (target.id === "preview-canvas" || target.querySelector("#preview-canvas"))
+  ) {
+    setTimeout(initCanvasInteractions, 50);
+  }
+
   // Apply fade-in animation to new content
   if (target && !target.classList.contains("no-fade")) {
     target.classList.add("fade-in");
@@ -46,6 +130,21 @@ document.body.addEventListener("htmx:afterSwap", function (event) {
       },
       { once: true }
     );
+  }
+});
+
+/**
+ * htmx:load fires on each element inserted by htmx (belt-and-suspenders for
+ * outerHTML swaps that target #preview-canvas via standard hx-swap).
+ */
+document.body.addEventListener("htmx:load", function (event) {
+  var elt = event.detail.elt;
+  if (!elt) return;
+  if (
+    elt.id === "preview-canvas" ||
+    (elt.querySelector && elt.querySelector("#preview-canvas"))
+  ) {
+    setTimeout(initCanvasInteractions, 50);
   }
 });
 
@@ -525,10 +624,568 @@ document.addEventListener("keydown", function (event) {
 });
 
 /* ==========================================================================
+   Canvas Drag-and-Drop
+   ========================================================================== */
+
+/**
+ * CanvasDrag — enables direct drag-and-drop repositioning of slots on the
+ * SVG preview canvas.
+ *
+ * Each slot <g> element is tagged by the server with:
+ *   class="draggable-slot"  data-slot-id  data-x  data-y  data-w  data-h
+ *
+ * On mouseup the new percentage position is PATCHed to
+ * /api/slots/{patternId}/{slotId}/position and the canvas is refreshed.
+ */
+var CanvasDrag = (function () {
+  var _state = null;
+
+  /** Attach drag listeners to all .draggable-slot groups in #preview-canvas. */
+  function init() {
+    var canvas = document.getElementById("preview-canvas");
+    if (!canvas) return;
+
+    var svg = canvas.querySelector("svg");
+    if (!svg) return;
+
+    var patternId = canvas.getAttribute("data-pattern-id");
+    if (!patternId) return;
+
+    svg.querySelectorAll("g.draggable-slot").forEach(function (group) {
+      // Avoid double-binding across re-renders
+      if (group.dataset.dragInit === "1") return;
+      group.dataset.dragInit = "1";
+      group.style.cursor = "move";
+
+      group.addEventListener("mousedown", function (e) {
+        // Ignore right-clicks and already-in-progress drags
+        if (e.button !== 0 || _state) return;
+        e.preventDefault();
+        e.stopPropagation();
+        // Dismiss any open text-edit overlay before starting a drag
+        if (typeof CanvasTextEdit !== "undefined") CanvasTextEdit.dismiss();
+
+        var svgRect = svg.getBoundingClientRect();
+        _state = {
+          group: group,
+          svg: svg,
+          svgRect: svgRect,
+          patternId: patternId,
+          slotId: group.getAttribute("data-slot-id"),
+          startClientX: e.clientX,
+          startClientY: e.clientY,
+          originXPct: parseFloat(group.getAttribute("data-x") || "0"),
+          originYPct: parseFloat(group.getAttribute("data-y") || "0"),
+          moved: false,
+        };
+
+        document.addEventListener("mousemove", _onMove);
+        document.addEventListener("mouseup", _onUp);
+      });
+    });
+  }
+
+  function _onMove(e) {
+    if (!_state) return;
+
+    var dx = e.clientX - _state.startClientX;
+    var dy = e.clientY - _state.startClientY;
+
+    if (!_state.moved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+      _state.moved = true;
+    }
+    if (!_state.moved) return;
+
+    // Convert screen delta → SVG coordinate delta
+    var viewBox = _state.svg.viewBox.baseVal;
+    var svgDx = (dx / _state.svgRect.width) * viewBox.width;
+    var svgDy = (dy / _state.svgRect.height) * viewBox.height;
+
+    _state.group.setAttribute("transform", "translate(" + svgDx + "," + svgDy + ")");
+  }
+
+  function _onUp(e) {
+    document.removeEventListener("mousemove", _onMove);
+    document.removeEventListener("mouseup", _onUp);
+
+    if (!_state) return;
+    var state = _state;
+    _state = null;
+
+    if (!state.moved) {
+      state.group.removeAttribute("transform");
+      // Single click → show selection / resize handles
+      if (typeof CanvasSelect !== "undefined") {
+        CanvasSelect.selectGroup(state.group, state.svg, state.patternId);
+      }
+      return;
+    }
+    // Drag completed — dismiss any open selection box
+    if (typeof CanvasSelect !== "undefined") CanvasSelect.deselect();
+
+    var dx = e.clientX - state.startClientX;
+    var dy = e.clientY - state.startClientY;
+
+    // Compute new percentage position (clamped to canvas bounds)
+    var dxPct = (dx / state.svgRect.width) * 100;
+    var dyPct = (dy / state.svgRect.height) * 100;
+    var newX = Math.max(0, state.originXPct + dxPct).toFixed(2);
+    var newY = Math.max(0, state.originYPct + dyPct).toFixed(2);
+
+    // PATCH position and refresh canvas with clean re-render
+    var formData = new FormData();
+    formData.append("x", newX);
+    formData.append("y", newY);
+
+    fetch(
+      "/api/slots/" + state.patternId + "/" + state.slotId + "/position",
+      { method: "PATCH", body: formData }
+    )
+      .then(function (r) {
+        return r.ok ? r.text() : Promise.reject("HTTP " + r.status);
+      })
+      .then(function (html) {
+        var canvas = document.getElementById("preview-canvas");
+        if (canvas) {
+          canvas.outerHTML = html;
+          htmx.process(document.body);
+          setTimeout(initCanvasInteractions, 50);
+        }
+      })
+      .catch(function (err) {
+        console.error("CanvasDrag: position sync failed:", err);
+        // Revert visual transform so the slot snaps back
+        state.group.removeAttribute("transform");
+        BannerToast.show("error", "位置の保存に失敗しました。", "Drag Error");
+      });
+  }
+
+  return { init: init };
+})();
+
+/* ==========================================================================
+   Canvas Text Edit (double-click to edit text slots inline)
+   ========================================================================== */
+
+/**
+ * CanvasTextEdit — double-click any text/button slot on the SVG canvas to
+ * open a positioned <textarea> overlay for inline editing.
+ *
+ * Flow:
+ *  1. dblclick on a .draggable-slot[data-slot-type=text|button|image_or_text]
+ *  2. A <textarea> is rendered with `position:fixed`, sized and placed over
+ *     the slot using getBoundingClientRect() (accounts for CSS zoom).
+ *  3. blur or Enter  → PATCH /api/slots/{patternId}/{slotId}, canvas re-renders.
+ *  4. Escape         → dismiss without saving.
+ */
+var CanvasTextEdit = (function () {
+  var _TEXT_TYPES = ["text", "button", "image_or_text"];
+  var _active = null; // { input, patternId, slotId, slotType }
+
+  /** Attach dblclick listeners to text-type .draggable-slot groups. */
+  function init() {
+    var canvas = document.getElementById("preview-canvas");
+    if (!canvas) return;
+
+    var svg = canvas.querySelector("svg");
+    if (!svg) return;
+
+    var patternId = canvas.getAttribute("data-pattern-id");
+    if (!patternId) return;
+
+    svg.querySelectorAll("g.draggable-slot").forEach(function (group) {
+      var slotType = group.getAttribute("data-slot-type");
+      if (!_TEXT_TYPES.includes(slotType)) return;
+      if (group.dataset.textEditInit === "1") return;
+      group.dataset.textEditInit = "1";
+
+      group.addEventListener("dblclick", function (e) {
+        // Rule B: locked slots keep drag/resize but block inline text editing
+        if (group.dataset.locked === "true") return;
+        e.preventDefault();
+        e.stopPropagation();
+        _openOverlay(group, svg, patternId);
+      });
+    });
+  }
+
+  /** Open the textarea overlay positioned over the given slot group. */
+  function _openOverlay(group, svg, patternId) {
+    dismiss(); // close any existing overlay first
+
+    var svgRect = svg.getBoundingClientRect();
+    var xPct  = parseFloat(group.getAttribute("data-x") || "0");
+    var yPct  = parseFloat(group.getAttribute("data-y") || "0");
+    var wPct  = parseFloat(group.getAttribute("data-w") || "20");
+    var hPct  = parseFloat(group.getAttribute("data-h") || "10");
+    var slotId   = group.getAttribute("data-slot-id");
+    var slotType = group.getAttribute("data-slot-type");
+
+    // Screen-space position of the slot (fixed coordinates, zoom-aware)
+    var left   = svgRect.left   + (xPct / 100) * svgRect.width;
+    var top    = svgRect.top    + (yPct / 100) * svgRect.height;
+    var width  = Math.max((wPct / 100) * svgRect.width,  48);
+    var height = Math.max((hPct / 100) * svgRect.height, 24);
+
+    // Read current text from the slot's <text> child (if any)
+    var textEl = group.querySelector("text");
+    var currentText = textEl ? (textEl.textContent || "") : "";
+
+    // Build overlay textarea
+    var ta = document.createElement("textarea");
+    ta.value = currentText;
+
+    var fontSize = Math.round(Math.max(11, height * 0.32));
+    ta.setAttribute("style", [
+      "position:fixed",
+      "left:"   + left   + "px",
+      "top:"    + top    + "px",
+      "width:"  + width  + "px",
+      "height:" + height + "px",
+      "min-height:28px",
+      "box-sizing:border-box",
+      "margin:0",
+      "padding:4px 6px",
+      "border:2px solid #6366f1",
+      "border-radius:4px",
+      "background:rgba(255,255,255,0.96)",
+      "color:#111",
+      "font-size:" + fontSize + "px",
+      "line-height:1.3",
+      "text-align:center",
+      "resize:none",
+      "overflow:hidden",
+      "outline:none",
+      "z-index:9999",
+      "box-shadow:0 0 0 3px rgba(99,102,241,0.25)",
+    ].join(";"));
+
+    document.body.appendChild(ta);
+    _active = { input: ta, patternId: patternId, slotId: slotId, slotType: slotType };
+
+    ta.focus();
+    ta.select();
+
+    ta.addEventListener("blur",    function () { _commit(); });
+    ta.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); _commit(); }
+      if (e.key === "Escape") { dismiss(); }
+    });
+  }
+
+  /** Save the overlay value and refresh the canvas. */
+  function _commit() {
+    if (!_active) return;
+    var o = _active;
+    _active = null;
+
+    var text = o.input.value; // preserve whitespace / newlines intentionally
+    o.input.remove();
+
+    // Immediately sync typed text to the AI tab prompt for this slot
+    syncTextToAiTab(o.slotId, text);
+
+    var formData = new FormData();
+    formData.append("content", text);
+    formData.append("slot_type", o.slotType === "button" ? "button" : "text");
+
+    fetch("/api/slots/" + o.patternId + "/" + o.slotId, {
+      method: "PATCH",
+      body: formData,
+    })
+      .then(function (r) { return r.ok ? r.text() : Promise.reject("HTTP " + r.status); })
+      .then(function (html) {
+        var canvas = document.getElementById("preview-canvas");
+        if (canvas) {
+          canvas.outerHTML = html;
+          htmx.process(document.body);
+          setTimeout(initCanvasInteractions, 50);
+        }
+      })
+      .catch(function (err) {
+        console.error("CanvasTextEdit: save failed:", err);
+        BannerToast.show("error", "テキストの保存に失敗しました。", "Edit Error");
+      });
+  }
+
+  /** Dismiss any open overlay without saving. */
+  function dismiss() {
+    if (_active) {
+      _active.input.remove();
+      _active = null;
+    }
+  }
+
+  return { init: init, dismiss: dismiss };
+})();
+
+/* ==========================================================================
+   Canvas Selection & Resize Handles
+   ========================================================================== */
+
+/**
+ * CanvasSelect — single-click a slot to show a bounding box with 8 resize
+ * handles (corners + edges). Drag a handle to resize; on mouseup the new
+ * geometry is PATCHed to /api/slots/{patternId}/{slotId}/position and the
+ * canvas re-renders.
+ *
+ * Handle directions: nw · n · ne · e · se · s · sw · w
+ * Left/top handles simultaneously update x/y to keep the anchor correct.
+ */
+var CanvasSelect = (function () {
+  var HANDLE_PX = 8;
+  var HALF = HANDLE_PX / 2;
+  var DIRS = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+  var CURSORS = {
+    nw: "nwse-resize", n: "ns-resize",  ne: "nesw-resize",
+    e:  "ew-resize",   se: "nwse-resize", s: "ns-resize",
+    sw: "nesw-resize", w:  "ew-resize",
+  };
+
+  var _sel    = null; // current selection state
+  var _resize = null; // active resize drag state
+
+  /* ── public ── */
+
+  function init() {
+    var canvas = document.getElementById("preview-canvas");
+    if (!canvas) return;
+    var svg = canvas.querySelector("svg");
+    if (!svg || svg.dataset.selectInit === "1") return;
+    svg.dataset.selectInit = "1";
+    // Click on canvas background → deselect
+    svg.addEventListener("click", function (e) {
+      if (!e.target.closest("g.draggable-slot")) deselect();
+    });
+  }
+
+  /** Show the selection overlay for a given slot group. */
+  function selectGroup(group, svg, patternId) {
+    deselect();
+
+    var svgRect = svg.getBoundingClientRect();
+    var xPct = parseFloat(group.getAttribute("data-x") || "0");
+    var yPct = parseFloat(group.getAttribute("data-y") || "0");
+    var wPct = parseFloat(group.getAttribute("data-w") || "10");
+    var hPct = parseFloat(group.getAttribute("data-h") || "10");
+    var slotId = group.getAttribute("data-slot-id");
+
+    var overlay = _buildOverlay(svgRect, xPct, yPct, wPct, hPct);
+    document.body.appendChild(overlay);
+
+    overlay.querySelectorAll(".rh").forEach(function (handle) {
+      handle.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        _resize = {
+          dir: handle.dataset.dir, overlay: overlay,
+          svgRect: svgRect, slotId: slotId, patternId: patternId,
+          startX: e.clientX, startY: e.clientY,
+          ox: xPct, oy: yPct, ow: wPct, oh: hPct,
+        };
+        document.removeEventListener("mousedown", _outsideClick);
+        document.addEventListener("mousemove", _onResizeMove);
+        document.addEventListener("mouseup",    _onResizeUp);
+      });
+    });
+
+    _sel = { overlay, group, svg, patternId, slotId, xPct, yPct, wPct, hPct };
+    setTimeout(function () {
+      document.addEventListener("mousedown", _outsideClick);
+    }, 0);
+  }
+
+  function deselect() {
+    document.removeEventListener("mousedown", _outsideClick);
+    var ov = document.getElementById("canvas-sel-overlay");
+    if (ov) ov.remove();
+    _sel = null;
+  }
+
+  /* ── private helpers ── */
+
+  function _buildOverlay(svgRect, xPct, yPct, wPct, hPct) {
+    var div = document.createElement("div");
+    div.id = "canvas-sel-overlay";
+    _positionOverlay(div, svgRect, xPct, yPct, wPct, hPct);
+    div.style.cssText += [
+      "border:2px solid #6366f1",
+      "box-sizing:border-box",
+      "pointer-events:none",
+      "z-index:10000",
+    ].join(";");
+
+    DIRS.forEach(function (dir) {
+      var h = document.createElement("div");
+      h.className = "rh";
+      h.dataset.dir = dir;
+      h.style.cssText = [
+        "position:absolute",
+        "width:" + HANDLE_PX + "px",
+        "height:" + HANDLE_PX + "px",
+        "background:#6366f1",
+        "border:1.5px solid #fff",
+        "border-radius:2px",
+        "pointer-events:all",
+        "cursor:" + CURSORS[dir],
+        "z-index:10001",
+        _handlePos(dir),
+      ].join(";");
+      div.appendChild(h);
+    });
+
+    return div;
+  }
+
+  function _handlePos(dir) {
+    var m = -HALF + "px";
+    var c = "calc(50% - " + HALF + "px)";
+    var pos = {
+      nw: "top:" + m + ";left:" + m,
+      n:  "top:" + m + ";left:" + c,
+      ne: "top:" + m + ";right:" + m,
+      e:  "top:" + c + ";right:" + m,
+      se: "bottom:" + m + ";right:" + m,
+      s:  "bottom:" + m + ";left:" + c,
+      sw: "bottom:" + m + ";left:" + m,
+      w:  "top:" + c + ";left:" + m,
+    };
+    return pos[dir] || "";
+  }
+
+  function _positionOverlay(div, svgRect, xPct, yPct, wPct, hPct) {
+    var l = svgRect.left + (xPct / 100) * svgRect.width;
+    var t = svgRect.top  + (yPct / 100) * svgRect.height;
+    var w = Math.max(4, (wPct / 100) * svgRect.width);
+    var h = Math.max(4, (hPct / 100) * svgRect.height);
+    div.style.cssText = [
+      "position:fixed",
+      "left:" + l + "px", "top:" + t + "px",
+      "width:" + w + "px", "height:" + h + "px",
+    ].join(";");
+  }
+
+  function _calcGeometry(r, clientX, clientY) {
+    var dxPct = ((clientX - r.startX) / r.svgRect.width)  * 100;
+    var dyPct = ((clientY - r.startY) / r.svgRect.height) * 100;
+    var x = r.ox, y = r.oy, w = r.ow, h = r.oh;
+    switch (r.dir) {
+      case "nw": x=r.ox+dxPct; y=r.oy+dyPct; w=r.ow-dxPct; h=r.oh-dyPct; break;
+      case "n":                 y=r.oy+dyPct;               h=r.oh-dyPct; break;
+      case "ne":                y=r.oy+dyPct; w=r.ow+dxPct; h=r.oh-dyPct; break;
+      case "e":                               w=r.ow+dxPct;               break;
+      case "se":                              w=r.ow+dxPct; h=r.oh+dyPct; break;
+      case "s":                                             h=r.oh+dyPct; break;
+      case "sw": x=r.ox+dxPct;               w=r.ow-dxPct; h=r.oh+dyPct; break;
+      case "w":  x=r.ox+dxPct;               w=r.ow-dxPct;               break;
+    }
+    return {
+      x: Math.max(0,   x),
+      y: Math.max(0,   y),
+      w: Math.max(1.5, w),
+      h: Math.max(1.5, h),
+    };
+  }
+
+  function _onResizeMove(e) {
+    if (!_resize) return;
+    var g = _calcGeometry(_resize, e.clientX, e.clientY);
+    _positionOverlay(_resize.overlay, _resize.svgRect, g.x, g.y, g.w, g.h);
+  }
+
+  function _onResizeUp(e) {
+    document.removeEventListener("mousemove", _onResizeMove);
+    document.removeEventListener("mouseup",   _onResizeUp);
+    if (!_resize) return;
+    var r = _resize;
+    _resize = null;
+
+    var g = _calcGeometry(r, e.clientX, e.clientY);
+    deselect();
+
+    var fd = new FormData();
+    fd.append("x",      g.x.toFixed(2));
+    fd.append("y",      g.y.toFixed(2));
+    fd.append("width",  g.w.toFixed(2));
+    fd.append("height", g.h.toFixed(2));
+
+    fetch("/api/slots/" + r.patternId + "/" + r.slotId + "/position", {
+      method: "PATCH", body: fd,
+    })
+      .then(function (res) { return res.ok ? res.text() : Promise.reject("HTTP " + res.status); })
+      .then(function (html) {
+        var canvas = document.getElementById("preview-canvas");
+        if (!canvas) return;
+        canvas.outerHTML = html;
+        htmx.process(document.body);
+        setTimeout(function () {
+          initCanvasInteractions();
+          // Re-select the resized slot so the user can keep adjusting
+          var newCanvas = document.getElementById("preview-canvas");
+          if (!newCanvas) return;
+          var svg = newCanvas.querySelector("svg");
+          var newGroup = svg && svg.querySelector('g[data-slot-id="' + r.slotId + '"]');
+          if (newGroup) selectGroup(newGroup, svg, r.patternId);
+        }, 50);
+      })
+      .catch(function (err) {
+        console.error("CanvasSelect: resize save failed:", err);
+        BannerToast.show("error", "サイズの保存に失敗しました。", "Resize Error");
+      });
+  }
+
+  function _outsideClick(e) {
+    var ov = document.getElementById("canvas-sel-overlay");
+    if (ov && ov.contains(e.target)) return;
+    if (e.target.closest && e.target.closest("g.draggable-slot")) return;
+    deselect();
+  }
+
+  return { init: init, selectGroup: selectGroup, deselect: deselect };
+})();
+
+/* ==========================================================================
+   Text → AI Tab Synchronization
+   ========================================================================== */
+
+/**
+ * syncTextToAiTab(slotId, text)
+ * Immediately copy a known text value into the AI tab's prompt field for that
+ * slot. Called after canvas inline edit or manual-tab save.
+ */
+function syncTextToAiTab(slotId, text) {
+  var el = document.getElementById("ai-prompt-" + slotId);
+  if (el && text && text.trim()) {
+    el.value = text.trim();
+  }
+}
+
+/**
+ * syncAllTextToAiTab()
+ * Walk every slot <g> in the current SVG canvas and copy any actual content
+ * (marked data-content="true") into the matching AI tab prompt textarea.
+ * Called after canvas re-renders so the AI tab stays in sync automatically.
+ */
+function syncAllTextToAiTab() {
+  var canvas = document.getElementById("preview-canvas");
+  if (!canvas) return;
+  var svg = canvas.querySelector("svg");
+  if (!svg) return;
+  svg.querySelectorAll("g.draggable-slot").forEach(function (group) {
+    var slotId = group.getAttribute("data-slot-id");
+    var textEl = group.querySelector('text[data-content="true"]');
+    if (textEl && textEl.textContent.trim()) {
+      syncTextToAiTab(slotId, textEl.textContent);
+    }
+  });
+}
+
+/* ==========================================================================
    Initialization
    ========================================================================== */
 
 document.addEventListener("DOMContentLoaded", function () {
   initCharCounters(document);
   initDragDropZones(document);
+  initCanvasInteractions();
 });
