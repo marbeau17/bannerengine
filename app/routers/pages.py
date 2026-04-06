@@ -45,10 +45,21 @@ async def slot_editor_partial(request: Request, pattern_id: str):
     template_service = request.app.state.template_service
     template = template_service.get_template(pattern_id)
     slot_values = request.session.get(f"slots_{pattern_id}", {})
+
+    # Apply the same Photoshop-order logic as the editor page
+    saved_order = slot_values.get("_order")
+    if saved_order and isinstance(saved_order, list):
+        slot_map = {s.id: s for s in template.slots}
+        ordered_slots = [slot_map[sid] for sid in saved_order if sid in slot_map]
+        ordered_slots += [s for s in template.slots if s.id not in saved_order]
+    else:
+        ordered_slots = list(template.slots)
+    display_slots = list(reversed(ordered_slots))
+
     return templates.TemplateResponse(
         request,
         "partials/slot_editor.html",
-        {"slots": template.slots, "slot_values": slot_values, "pattern_id": pattern_id},
+        {"slots": display_slots, "slot_values": slot_values, "pattern_id": pattern_id},
     )
 
 
@@ -77,13 +88,27 @@ async def editor(request: Request, pattern_id: str):
     except Exception:
         svg_markup = None
 
+    # Build sidebar slot list respecting session draw order and Photoshop convention.
+    # _order is stored in draw sequence (index 0 = bottom-most layer in SVG).
+    # Reverse before passing to the template so that the highest-z-index slot
+    # (the last to be drawn) sits at the top of the UI list — matching Photoshop.
+    saved_order = slot_values.get("_order")
+    if saved_order and isinstance(saved_order, list):
+        slot_map = {s.id: s for s in template.slots}
+        ordered_slots = [slot_map[sid] for sid in saved_order if sid in slot_map]
+        # Include any slots not yet in the saved order (e.g. newly added)
+        ordered_slots += [s for s in template.slots if s.id not in slot_map or s.id not in saved_order]
+    else:
+        ordered_slots = list(template.slots)
+    display_slots = list(reversed(ordered_slots))
+
     return templates.TemplateResponse(
         request,
         "pages/editor.html",
         {
             "template": template,
             "pattern_id": pattern_id,
-            "slots": template.slots,
+            "slots": display_slots,
             "slot_values": slot_values,
             "svg_markup": svg_markup,
         },

@@ -37,11 +37,14 @@ class SvgRenderer:
             self._defs = ET.SubElement(svg, "defs")
             self._render_background(svg, template.design, width, height)
 
-            # Apply custom draw order (Phase 1)
+            # Apply custom draw order (Photoshop convention).
+            # _order is stored as draw sequence: index 0 = bottom layer, last index = top layer.
+            # We iterate reversed(order) so the bottom layer is drawn first (lowest z-index)
+            # and the top layer is drawn last (highest z-index / front of canvas).
             slots = list(template.slots)
             order = slot_values.get("_order")
             if order and isinstance(order, list):
-                order_map = {sid: i for i, sid in enumerate(order)}
+                order_map = {sid: i for i, sid in enumerate(reversed(order))}
                 slots.sort(key=lambda s: order_map.get(s.id, len(order)))
 
             for slot in slots:
