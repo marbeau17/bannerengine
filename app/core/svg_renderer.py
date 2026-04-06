@@ -52,25 +52,39 @@ class SvgRenderer:
             self._defs = ET.SubElement(svg, "defs")
             self._render_background(svg, template.design, width, height)
 
-            # Apply custom draw order (Photoshop convention).
-            # _order is stored as draw sequence: index 0 = bottom layer, last index = top layer.
-            # We iterate reversed(order) so the bottom layer is drawn first (lowest z-index)
-            # and the top layer is drawn last (highest z-index / front of canvas).
-            slots = list(template.slots)
-            order = slot_values.get("_order")
-            if order and isinstance(order, list):
-                order_map = {sid: i for i, sid in enumerate(reversed(order))}
-                slots.sort(key=lambda s: order_map.get(s.id, len(order)))
-
-            for slot in slots:
+            # --- Unified draw pass (template slots + custom layers) ---
+            # Build a single list of (kind, item) pairs, skipping hidden slots.
+            # kind = "slot" | "custom"
+            all_items: list[tuple[str, Any]] = []
+            for slot in template.slots:
                 value = slot_values.get(slot.id)
-                self._render_slot(svg, slot, value, template)
+                if isinstance(value, dict) and value.get("_hidden"):
+                    continue
+                all_items.append(("slot", slot))
 
-            # Render freeform custom layers on top (Phase 2)
             custom_layers = slot_values.get("_custom_layers")
             if custom_layers and isinstance(custom_layers, list):
                 for layer in custom_layers:
-                    self._render_custom_layer(svg, layer, width, height)
+                    all_items.append(("custom", layer))
+
+            # Sort by global _order (Photoshop convention: reversed so index 0
+            # = bottom layer drawn first, last index = top layer drawn last).
+            order = slot_values.get("_order")
+            if order and isinstance(order, list):
+                order_map = {sid: i for i, sid in enumerate(reversed(order))}
+
+                def _item_id(item: tuple[str, Any]) -> str:
+                    kind, data = item
+                    return data.id if kind == "slot" else data.get("id", "")
+
+                all_items.sort(key=lambda item: order_map.get(_item_id(item), len(order)))
+
+            for kind, item in all_items:
+                if kind == "slot":
+                    value = slot_values.get(item.id)
+                    self._render_slot(svg, item, value, template)
+                else:
+                    self._render_custom_layer(svg, item, width, height)
 
             return ET.tostring(svg, encoding="unicode", xml_declaration=False)
         except GenerationError:

@@ -737,10 +737,11 @@ var CanvasDrag = (function () {
     formData.append("x", newX);
     formData.append("y", newY);
 
-    fetch(
-      "/api/slots/" + state.patternId + "/" + state.slotId + "/position",
-      { method: "PATCH", body: formData }
-    )
+    // Route custom layers to /api/layers/ — /api/slots/ only handles template slots
+    var dragUrl = state.slotId.startsWith("custom_")
+      ? "/api/layers/" + state.patternId + "/" + state.slotId
+      : "/api/slots/" + state.patternId + "/" + state.slotId + "/position";
+    fetch(dragUrl, { method: "PATCH", body: formData })
       .then(function (r) {
         return r.ok ? r.text() : Promise.reject("HTTP " + r.status);
       })
@@ -1109,9 +1110,11 @@ var CanvasSelect = (function () {
     fd.append("width",  g.w.toFixed(2));
     fd.append("height", g.h.toFixed(2));
 
-    fetch("/api/slots/" + r.patternId + "/" + r.slotId + "/position", {
-      method: "PATCH", body: fd,
-    })
+    // Route custom layers to /api/layers/ — /api/slots/ only handles template slots
+    var resizeUrl = r.slotId.startsWith("custom_")
+      ? "/api/layers/" + r.patternId + "/" + r.slotId
+      : "/api/slots/" + r.patternId + "/" + r.slotId + "/position";
+    fetch(resizeUrl, { method: "PATCH", body: fd })
       .then(function (res) { return res.ok ? res.text() : Promise.reject("HTTP " + res.status); })
       .then(function (html) {
         var canvas = document.getElementById("preview-canvas");

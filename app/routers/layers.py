@@ -67,6 +67,16 @@ async def add_layer(request: Request, pattern_id: str):
     layers = _get_custom_layers(request, pattern_id)
     layers.append(new_layer)
     _save_custom_layers(request, pattern_id, layers)
+
+    # Auto-stack: inject the new layer at the END of _order so it sorts to the
+    # top of the Photoshop-style sidebar (reversed display = last item shown first).
+    slots = dict(request.session.get(f"slots_{pattern_id}", {}))
+    order: list = list(slots.get("_order", []))
+    if layer_id not in order:
+        order.append(layer_id)
+    slots["_order"] = order
+    request.session[f"slots_{pattern_id}"] = slots
+
     return _render_canvas(request, pattern_id)
 
 
