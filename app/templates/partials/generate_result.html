@@ -115,6 +115,18 @@
   ></div>
   {% endif %}
 
+  {# Refresh the SVG preview canvas so it reflects auto-filled slots #}
+  {% if pattern_id %}
+  <div
+    hx-get="/api/slots/{{ pattern_id }}/refresh-preview"
+    hx-trigger="load"
+    hx-target="#preview-canvas"
+    hx-swap="outerHTML"
+    class="hidden"
+    aria-hidden="true"
+  ></div>
+  {% endif %}
+
   <!-- Fix 4: After slot editor OOB refresh, lock slots that the AI filled in -->
   <script>
     (function() {

@@ -370,6 +370,33 @@ async def save_all_slots(request: Request, pattern_id: str):
     return {"status": "ok", "pattern_id": pattern_id, "saved": len(session_slots)}
 
 
+@router.get("/{pattern_id}/refresh-preview", response_class=HTMLResponse)
+async def refresh_preview(request: Request, pattern_id: str):
+    """Return a fresh preview canvas partial for HTMX swap.
+
+    Used by the AI completion flow to refresh the canvas after
+    auto-filled slot values have been persisted to the session.
+    """
+    template_service = request.app.state.template_service
+    svg_renderer = request.app.state.svg_renderer
+    template = template_service.get_template(pattern_id)
+
+    session_slots = _get_session_slots(request, pattern_id)
+
+    effective_template = template
+    design_overrides = session_slots.get("_design")
+    if isinstance(design_overrides, dict) and design_overrides.get("background_value"):
+        effective_template = template.model_copy(deep=True)
+        effective_template.design.background_value = design_overrides["background_value"]
+
+    svg_markup = svg_renderer.render(effective_template, session_slots)
+    return templates.TemplateResponse(
+        request,
+        "partials/preview_canvas.html",
+        {"template": effective_template, "pattern_id": pattern_id, "svg_markup": svg_markup},
+    )
+
+
 @router.get("/{pattern_id}/{slot_id}")
 async def get_slot_value(request: Request, pattern_id: str, slot_id: str):
     """Return the current value for a single slot from the session."""
