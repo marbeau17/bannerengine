@@ -50,6 +50,12 @@ class BannerService:
         """
         template: BannerTemplate = self.template_service.get_template(pattern_id)
 
+        # Apply session design overrides so the AI instruction reflects the user's background choice
+        design_overrides = slot_values.get("_design", {})
+        if isinstance(design_overrides, dict) and design_overrides.get("background_value"):
+            template = template.model_copy(deep=True)
+            template.design.background_value = design_overrides["background_value"]
+
         canvas = {
             "width": template.meta.width,
             "height": template.meta.height,

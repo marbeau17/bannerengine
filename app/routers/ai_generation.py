@@ -287,8 +287,15 @@ async def _run_blend_pipeline(
         job["progress"] = 50
         job["step"] = "レイアウトを組み立て中... (50%)"
 
+        # Apply design overrides so the composite PNG reflects the user's background choice
+        effective_template = template
+        design_overrides = slot_values.get("_design")
+        if isinstance(design_overrides, dict) and design_overrides.get("background_value"):
+            effective_template = template.model_copy(deep=True)
+            effective_template.design.background_value = design_overrides["background_value"]
+
         # Step 3: Render composite SVG → PNG (50–60%)
-        svg_string = svg_renderer.render(template, slot_values)
+        svg_string = svg_renderer.render(effective_template, slot_values)
         svg_embedded = await asyncio.to_thread(_embed_local_images, svg_string)
         png_bytes = await asyncio.to_thread(
             _svg_to_png, svg_embedded, template.meta.width, template.meta.height
