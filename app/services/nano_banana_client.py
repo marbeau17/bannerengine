@@ -383,20 +383,12 @@ Important:
             layer_type = layer.get("type", "")
             if layer_type == "text":
                 content = layer.get("content", "")
-                pos = layer.get("position", {})
-                size = layer.get("size", {})
                 if content:
-                    suffix = "— keep this exact text." if mode == "manual" else "— may be rewritten creatively."
-                    parts.append(
-                        f'Text: "{content}" at ({pos.get("x", 0)}, {pos.get("y", 0)}), '
-                        f'size {size.get("width", 0)}x{size.get("height", 0)}px {suffix}'
-                    )
+                    suffix = "keep this exact text." if mode == "manual" else "may be rewritten creatively."
+                    parts.append(f'Text element: "{content}" — {suffix}')
             elif layer_type == "image":
-                pos = layer.get("position", {})
-                size = layer.get("size", {})
                 parts.append(
-                    f'Image area at ({pos.get("x", 0)}, {pos.get("y", 0)}), '
-                    f'size {size.get("width", 0)}x{size.get("height", 0)}px.'
+                    "Image area — maintain the exact position and size shown in the reference image."
                 )
 
         if user_prompt:

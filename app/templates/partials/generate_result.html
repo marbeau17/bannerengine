@@ -114,6 +114,33 @@
     aria-hidden="true"
   ></div>
   {% endif %}
+
+  <!-- Fix 4: After slot editor OOB refresh, lock slots that the AI filled in -->
+  <script>
+    (function() {
+      function syncLockStatesFromEditor() {
+        document.querySelectorAll('[id^="ai-slot-container-"]').forEach(function(container) {
+          var slotId = container.id.replace('ai-slot-container-', '');
+          if (container.dataset.locked === 'true') return; // already locked by user
+          var slotDiv = document.getElementById('slot-' + slotId);
+          if (!slotDiv) return;
+          // Find the first text-bearing input in this slot's editor
+          var textEl = slotDiv.querySelector('textarea, input[type="text"]');
+          var value = textEl ? textEl.value.trim() : '';
+          if (value && typeof setSlotGeneratedState === 'function') {
+            setSlotGeneratedState(slotId, value);
+          }
+        });
+      }
+      // One-time listener: fires when the hidden div above triggers the slot editor swap
+      document.body.addEventListener('htmx:afterSwap', function onEditorSwap(e) {
+        if (e.detail && e.detail.target && e.detail.target.id === 'slot-editor-panel') {
+          document.body.removeEventListener('htmx:afterSwap', onEditorSwap);
+          setTimeout(syncLockStatesFromEditor, 100);
+        }
+      });
+    })();
+  </script>
 </div>
 
 {% elif status == 'completed' %}

@@ -211,18 +211,31 @@
         {% endif %}
 
         <!-- Input row (prompt mode) -->
-        <div id="ai-slot-input-row-{{ slot.id }}" class="flex gap-1.5">
-          <textarea
-            id="ai-prompt-{{ slot.id }}"
-            rows="2"
-            placeholder="{{ slot.prompt_placeholder or 'プロンプトを入力...' }}"
-            class="flex-1 text-xs border border-gray-300 rounded-md px-2 py-1.5 resize-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
-          ></textarea>
-          <button
-            type="button"
-            onclick="generateSlot('{{ pattern_id }}', '{{ slot.id }}', '{{ slot.type.value }}')"
-            class="self-start px-2 py-1.5 text-[11px] bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-md font-semibold whitespace-nowrap transition-colors"
-          >生成</button>
+        <div id="ai-slot-input-row-{{ slot.id }}">
+          <div class="flex gap-1.5">
+            <textarea
+              id="ai-prompt-{{ slot.id }}"
+              rows="2"
+              placeholder="{{ slot.prompt_placeholder or 'プロンプトを入力...' }}"
+              class="flex-1 text-xs border border-gray-300 rounded-md px-2 py-1.5 resize-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+            ></textarea>
+            <button
+              type="button"
+              onclick="generateSlot('{{ pattern_id }}', '{{ slot.id }}', '{{ slot.type.value }}')"
+              class="self-start px-2 py-1.5 text-[11px] bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-md font-semibold whitespace-nowrap transition-colors"
+            >生成</button>
+          </div>
+          {% if slot.type.value in ('image', 'image_or_text') %}
+          <!-- Fix 2: 透明化 toggle in AI tab (mirrors Manual tab) -->
+          <label class="flex items-center gap-2 mt-1.5 cursor-pointer select-none">
+            <div class="relative">
+              <input type="checkbox" id="ai-rembg-toggle-{{ slot.id }}" class="sr-only peer">
+              <div class="w-8 h-4 bg-gray-200 rounded-full peer-checked:bg-green-500 transition-colors"></div>
+              <div class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+            </div>
+            <span class="text-[10px] text-gray-500">透明化 (背景除去)</span>
+          </label>
+          {% endif %}
         </div>
 
         <!-- Generated state (shown after successful individual generation) -->
@@ -521,9 +534,11 @@
       var data = JSON.parse(e.data);
       if (data.status === 'completed' && data.image_url) {
         evtSource.close();
+        var aiRembgToggle = document.getElementById('ai-rembg-toggle-' + slotId);
         var applyForm = new FormData();
         applyForm.append('image_url', data.image_url);
         applyForm.append('prompt', document.getElementById('ai-prompt-' + slotId).value);
+        applyForm.append('transparent_bg', (aiRembgToggle && aiRembgToggle.checked) ? 'true' : 'false');
         fetch('/api/image-generate/apply/' + patternId + '/' + slotId, {
           method: 'POST',
           body: applyForm
@@ -679,6 +694,21 @@
         onEnd: function() {
           var items = sortList.querySelectorAll('li[data-slot-id]');
           var order = Array.from(items).map(function(li) { return li.dataset.slotId; });
+
+          // Fix 1: Reorder right-side panels to match new left-sidebar order
+          var slotEditorContainer = document.querySelector('#slot-editor-panel .space-y-4');
+          var aiPanel = document.getElementById('panel-ai');
+          order.forEach(function(slotId) {
+            if (slotEditorContainer) {
+              var el = document.getElementById('slot-' + slotId);
+              if (el) slotEditorContainer.appendChild(el);
+            }
+            if (aiPanel) {
+              var aiEl = document.getElementById('ai-slot-container-' + slotId);
+              if (aiEl) aiPanel.appendChild(aiEl);
+            }
+          });
+
           fetch('/api/slots/order/{{ pattern_id }}', {
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
