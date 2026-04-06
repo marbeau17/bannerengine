@@ -93,12 +93,13 @@ async def update_layer(request: Request, pattern_id: str, layer_id: str):
     """Edit a freeform layer's properties and return a refreshed preview canvas."""
     form = await request.form()
     layers = _get_custom_layers(request, pattern_id)
+    _NUMERIC_FIELDS = {"x", "y", "width", "height", "opacity"}
     for layer in layers:
         if layer["id"] == layer_id:
             for field in ("fill", "color", "opacity", "text", "font_size", "x", "y", "width", "height"):
                 val = form.get(field)
                 if val is not None:
-                    layer[field] = str(val)
+                    layer[field] = float(val) if field in _NUMERIC_FIELDS else str(val)
             break
     _save_custom_layers(request, pattern_id, layers)
     return _render_canvas(request, pattern_id)

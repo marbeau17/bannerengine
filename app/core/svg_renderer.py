@@ -391,10 +391,10 @@ class SvgRenderer:
             "class": "draggable-slot custom-layer",
             "data-slot-id": layer_id,
             "data-slot-type": layer_type,
-            "data-x": f"{layer.get('x', 10):.4f}",
-            "data-y": f"{layer.get('y', 10):.4f}",
-            "data-w": f"{layer.get('width', 30):.4f}",
-            "data-h": f"{layer.get('height', 20):.4f}",
+            "data-x": f"{float(layer.get('x', 10)):.4f}",
+            "data-y": f"{float(layer.get('y', 10)):.4f}",
+            "data-w": f"{float(layer.get('width', 30)):.4f}",
+            "data-h": f"{float(layer.get('height', 20)):.4f}",
             "opacity": f"{opacity:.2f}",
         }
         g = ET.SubElement(svg, "g", attrib=g_attribs)
