@@ -464,6 +464,18 @@ class SvgRenderer:
             return url
         if not url or url.startswith("data:"):
             return url
+        # Fetch remote URLs and embed as Base64 so offline tools like Illustrator can render them
+        if url.startswith("http://") or url.startswith("https://"):
+            import urllib.request
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "BannerEngine/1.0"})
+                with urllib.request.urlopen(req, timeout=5.0) as response:
+                    img_data = response.read()
+                    mime = response.headers.get_content_type() or "image/png"
+                    encoded = base64.b64encode(img_data).decode("ascii")
+                    return f"data:{mime};base64,{encoded}"
+            except Exception:
+                return url
         # Resolve server-relative paths to filesystem paths
         local_path = url.lstrip("/") if url.startswith("/") else url
         if not os.path.exists(local_path):
