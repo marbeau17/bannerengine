@@ -101,6 +101,18 @@ try:
 except (ImportError, AttributeError) as exc:
     logger.warning("Could not import ai_generation router: %s", exc)
 
+try:
+    from app.routers import layers
+    _routers.append(layers.router)
+except (ImportError, AttributeError) as exc:
+    logger.warning("Could not import layers router: %s", exc)
+
+try:
+    from app.routers import export
+    _routers.append(export.router)
+except (ImportError, AttributeError) as exc:
+    logger.warning("Could not import export router: %s", exc)
+
 
 # ---------------------------------------------------------------------------
 # Startup / shutdown logic

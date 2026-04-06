@@ -69,6 +69,20 @@
         placeholder="{{ current_slot.prompt_placeholder or '例: 赤いスポーツカー、白い背景、プロフェッショナルな写真風' }}"
       >{{ (current_value.get('prompt') if current_value is mapping else '') or '' }}</textarea>
 
+      <!-- Phase 3: 透明化 (background removal) toggle -->
+      <label class="flex items-center gap-2 cursor-pointer select-none">
+        <div class="relative">
+          <input
+            type="checkbox"
+            id="rembg-toggle-{{ current_slot.id }}"
+            class="sr-only peer"
+          >
+          <div class="w-8 h-4 bg-gray-200 rounded-full peer-checked:bg-green-500 transition-colors"></div>
+          <div class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+        </div>
+        <span class="text-[11px] text-gray-600 font-medium">透明化 (背景除去)</span>
+      </label>
+
       <button
         type="button"
         class="w-full py-2 px-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-xs font-semibold rounded-lg shadow transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
@@ -224,10 +238,13 @@
   function applyGeneratedImage(patternId, slotId) {
     var imageUrl = document.getElementById('gen-result-img-' + slotId).dataset.imageUrl;
     var prompt = document.getElementById('prompt-' + slotId).value.trim();
+    var toggleEl = document.getElementById('rembg-toggle-' + slotId);
+    var transparentBg = toggleEl ? toggleEl.checked : false;
 
     var formData = new FormData();
     formData.append('image_url', imageUrl);
     formData.append('prompt', prompt);
+    formData.append('transparent_bg', transparentBg ? 'true' : 'false');
 
     fetch('/api/image-generate/apply/' + patternId + '/' + slotId, {
       method: 'POST',

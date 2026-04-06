@@ -149,6 +149,7 @@ async def apply_generated_image(request: Request, pattern_id: str, slot_id: str)
     form_data = await request.form()
     image_url = form_data.get("image_url", "")
     prompt = form_data.get("prompt", "")
+    transparent_bg = str(form_data.get("transparent_bg", "false")).lower() == "true"
 
     if not image_url:
         raise ValidationError(
@@ -156,12 +157,60 @@ async def apply_generated_image(request: Request, pattern_id: str, slot_id: str)
             errors=["Missing image_url"],
         )
 
+    final_url = str(image_url)
+
+    # Phase 3: Background removal via rembg when the 透明化 toggle is active
+    if transparent_bg:
+        try:
+            import asyncio as _asyncio
+            import io as _io
+            import os as _os
+            from rembg import remove as _rembg_remove
+            from PIL import Image as _PILImage
+
+            # Load source image bytes
+            img_bytes: bytes | None = None
+            if final_url.startswith("/static/"):
+                local_path = final_url.lstrip("/")
+                if _os.path.exists(local_path):
+                    with open(local_path, "rb") as f:
+                        img_bytes = f.read()
+            if img_bytes is None:
+                import httpx as _httpx
+                async with _httpx.AsyncClient() as client:
+                    resp = await client.get(final_url, timeout=15)
+                    img_bytes = resp.content
+
+            # Remove background (runs synchronously in a thread to avoid blocking)
+            def _do_remove(data: bytes) -> bytes:
+                img_in = _PILImage.open(_io.BytesIO(data)).convert("RGBA")
+                result = _rembg_remove(img_in)
+                buf = _io.BytesIO()
+                result.save(buf, format="PNG")
+                return buf.getvalue()
+
+            removed_bytes = await _asyncio.to_thread(_do_remove, img_bytes)
+
+            # Save the processed PNG alongside other generated assets
+            from app.routers.generate import OUTPUT_DIR as _OUT_DIR
+            import uuid as _uuid
+            out_filename = f"rembg_{_uuid.uuid4().hex[:12]}.png"
+            out_path = _os.path.join(_OUT_DIR, out_filename)
+            with open(out_path, "wb") as f:
+                f.write(removed_bytes)
+            final_url = f"/static/generated/{out_filename}"
+        except ImportError:
+            logger.warning("rembg not installed — skipping background removal")
+        except Exception as exc:
+            logger.warning("Background removal failed for slot %s: %s", slot_id, exc)
+
     # Update session
     session_slots = request.session.get(f"slots_{pattern_id}", {})
     session_slots[slot_id] = {
-        "source_url": str(image_url),
+        "source_url": final_url,
         "prompt": str(prompt),
         "fit": "cover",
+        "transparent_bg": transparent_bg,
     }
     request.session[f"slots_{pattern_id}"] = session_slots
 

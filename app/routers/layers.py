@@ -1,0 +1,94 @@
+"""Freeform layer management — spawn/edit/delete custom layers on the canvas."""
+
+from __future__ import annotations
+
+import uuid
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
+router = APIRouter(prefix="/api/layers", tags=["layers"])
+templates = Jinja2Templates(directory="app/templates")
+
+# Default geometry and style for each layer type
+_LAYER_DEFAULTS: dict[str, dict] = {
+    "rect":   {"fill": "#4f46e5", "label": "Rectangle"},
+    "circle": {"fill": "#059669", "label": "Circle"},
+    "text":   {"text": "Text Layer", "color": "#111111", "font_size": "24"},
+    "image":  {"source_url": "", "label": "Image Layer"},
+}
+
+
+def _get_custom_layers(request: Request, pattern_id: str) -> list:
+    return list(request.session.get(f"slots_{pattern_id}", {}).get("_custom_layers", []))
+
+
+def _save_custom_layers(request: Request, pattern_id: str, layers: list) -> None:
+    slots = dict(request.session.get(f"slots_{pattern_id}", {}))
+    slots["_custom_layers"] = layers
+    request.session[f"slots_{pattern_id}"] = slots
+
+
+def _render_canvas(request: Request, pattern_id: str) -> HTMLResponse:
+    """Re-render the preview canvas with current slot + custom layer state."""
+    template_service = request.app.state.template_service
+    svg_renderer = request.app.state.svg_renderer
+    template = template_service.get_template(pattern_id)
+    slot_values = dict(request.session.get(f"slots_{pattern_id}", {}))
+    svg_markup = svg_renderer.render(template, slot_values)
+    return templates.TemplateResponse(
+        request,
+        "partials/preview_canvas.html",
+        {"template": template, "pattern_id": pattern_id, "svg_markup": svg_markup},
+    )
+
+
+@router.post("/{pattern_id}", response_class=HTMLResponse)
+async def add_layer(request: Request, pattern_id: str):
+    """Spawn a new freeform layer and return a refreshed preview canvas."""
+    form = await request.form()
+    layer_type = str(form.get("layer_type", "rect"))
+    if layer_type not in _LAYER_DEFAULTS:
+        layer_type = "rect"
+
+    layer_id = f"custom_{uuid.uuid4().hex[:8]}"
+    new_layer: dict = {
+        "id": layer_id,
+        "type": layer_type,
+        "x": 10.0,
+        "y": 10.0,
+        "width": 30.0,
+        "height": 20.0,
+        "opacity": 1.0,
+        **_LAYER_DEFAULTS[layer_type],
+    }
+
+    layers = _get_custom_layers(request, pattern_id)
+    layers.append(new_layer)
+    _save_custom_layers(request, pattern_id, layers)
+    return _render_canvas(request, pattern_id)
+
+
+@router.delete("/{pattern_id}/{layer_id}", response_class=HTMLResponse)
+async def delete_layer(request: Request, pattern_id: str, layer_id: str):
+    """Remove a freeform layer and return a refreshed preview canvas."""
+    layers = [l for l in _get_custom_layers(request, pattern_id) if l["id"] != layer_id]
+    _save_custom_layers(request, pattern_id, layers)
+    return _render_canvas(request, pattern_id)
+
+
+@router.patch("/{pattern_id}/{layer_id}", response_class=HTMLResponse)
+async def update_layer(request: Request, pattern_id: str, layer_id: str):
+    """Edit a freeform layer's properties and return a refreshed preview canvas."""
+    form = await request.form()
+    layers = _get_custom_layers(request, pattern_id)
+    for layer in layers:
+        if layer["id"] == layer_id:
+            for field in ("fill", "color", "opacity", "text", "font_size", "x", "y", "width", "height"):
+                val = form.get(field)
+                if val is not None:
+                    layer[field] = str(val)
+            break
+    _save_custom_layers(request, pattern_id, layers)
+    return _render_canvas(request, pattern_id)

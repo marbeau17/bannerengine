@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.core.exceptions import TemplateNotFoundError, ValidationError
@@ -53,6 +53,39 @@ def _set_session_slots(
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+
+@router.patch("/order/{pattern_id}")
+async def update_slot_order(request: Request, pattern_id: str):
+    """Persist the drag-reordered layer sequence for a template.
+
+    Accepts JSON: ``{"order": ["slot_id_1", "slot_id_2", ...]}``
+    The SVG renderer reads ``_order`` from the session and draws slots in
+    that sequence, controlling which elements appear in front of others.
+    """
+    body = await request.json()
+    order = body.get("order", [])
+    session_slots = _get_session_slots(request, pattern_id)
+    session_slots["_order"] = [str(sid) for sid in order]
+    _set_session_slots(request, pattern_id, session_slots)
+    return {"status": "ok", "order": order}
+
+
+@router.post("/{pattern_id}/reset")
+async def reset_slots(request: Request, pattern_id: str):
+    """Wipe all session overrides for a template and trigger a full page reload.
+
+    Clears:
+    - ``slots_{pattern_id}``  — all text, position, AI-generated values
+    - ``custom_ref_{pattern_id}`` — any custom uploaded reference image
+
+    Returns an empty 204 response with ``HX-Refresh: true`` so HTMX performs
+    a hard reload, cleanly resetting all frontend state (lock states, inputs, etc.)
+    without any extra JavaScript.
+    """
+    request.session.pop(f"slots_{pattern_id}", None)
+    request.session.pop(f"custom_ref_{pattern_id}", None)
+    return Response(status_code=204, headers={"HX-Refresh": "true"})
 
 
 @router.patch("/{pattern_id}/{slot_id}", response_class=HTMLResponse)
@@ -137,6 +170,14 @@ async def update_slot(request: Request, pattern_id: str, slot_id: str):
         form_val = form_data.get(field)
         if form_val is not None:
             existing[field] = str(form_val)
+
+    # Merge opacity (slider sends 0-100, store as 0.0-1.0 float)
+    opacity_val = form_data.get("opacity")
+    if opacity_val is not None and str(opacity_val).strip():
+        try:
+            existing["opacity"] = round(max(0.0, min(100.0, float(opacity_val))) / 100.0, 2)
+        except (ValueError, TypeError):
+            pass
 
     # Merge position/size overrides (px → % conversion)
     canvas_w = template.meta.width

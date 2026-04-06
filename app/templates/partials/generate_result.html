@@ -43,13 +43,23 @@
   <div id="tab-ai">
     {% if ai_file_url %}
     <img src="{{ ai_file_url }}" alt="AI generated banner" class="w-full rounded border border-gray-200">
+    {% set ai_filename = ai_file_url.split('/')[-1] %}
     <div class="flex flex-wrap gap-2 mt-2">
-      <a href="{{ ai_file_url }}" download
+      <!-- PNG -->
+      <a href="/api/export/{{ ai_filename }}?format=png" download
          class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-md transition-colors">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
         </svg>
-        AI PNG
+        PNG
+      </a>
+      <!-- JPEG -->
+      <a href="/api/export/{{ ai_filename }}?format=jpeg" download
+         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-md transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
+        </svg>
+        JPEG
       </a>
     </div>
     {% endif %}
@@ -59,16 +69,26 @@
   <div id="tab-original" class="hidden">
     {% if file_url %}
     <img src="{{ file_url }}" alt="Original rendered banner" class="w-full rounded border border-gray-200">
+    {% set orig_filename = file_url.split('/')[-1] %}
     <div class="flex flex-wrap gap-2 mt-2">
-      <a href="{{ file_url }}" download
+      <!-- PNG -->
+      <a href="/api/export/{{ orig_filename }}?format=png" download
          class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
         </svg>
         PNG
       </a>
+      <!-- JPEG -->
+      <a href="/api/export/{{ orig_filename }}?format=jpeg" download
+         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-semibold rounded-md transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
+        </svg>
+        JPEG
+      </a>
       {% if pattern_id %}
-
+      <!-- SVG (original only) -->
       <a href="/api/generate/svg/{{ pattern_id }}" download
          class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-md transition-colors">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,6 +100,20 @@
     </div>
     {% endif %}
   </div>
+
+  <!-- Phase 5: OOB sync — after AI pipeline completes, refresh sidebar slot editor
+       so newly generated text auto-populates and locks in the manual tab fields.
+       hx-trigger="load" fires as soon as this element lands in the DOM. -->
+  {% if pattern_id %}
+  <div
+    hx-get="/api/pages/slot-editor/{{ pattern_id }}"
+    hx-trigger="load"
+    hx-target="#slot-editor-panel"
+    hx-swap="innerHTML"
+    class="hidden"
+    aria-hidden="true"
+  ></div>
+  {% endif %}
 </div>
 
 {% elif status == 'completed' %}
@@ -95,16 +129,26 @@
   </div>
   <div class="flex flex-wrap gap-2 mt-1">
     {% if file_url %}
-    <a href="{{ file_url }}" download
+    {% set orig_filename = file_url.split('/')[-1] %}
+    <!-- PNG -->
+    <a href="/api/export/{{ orig_filename }}?format=png" download
        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors">
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
       </svg>
       PNG
     </a>
+    <!-- JPEG -->
+    <a href="/api/export/{{ orig_filename }}?format=jpeg" download
+       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-semibold rounded-md transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
+      </svg>
+      JPEG
+    </a>
     {% endif %}
     {% if pattern_id %}
-
+    <!-- SVG -->
     <a href="/api/generate/svg/{{ pattern_id }}" download
        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-md transition-colors">
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

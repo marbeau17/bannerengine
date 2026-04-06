@@ -351,15 +351,20 @@ Important:
         layers = instruction.get("layers", [])
 
         if mode == "ai":
-            # Creative mode: reference is a rough guideline only
+            # Creative mode: polish aesthetics freely but RESPECT physical layout structure.
+            # Phase 4: We must constrain hallucinations — the AI may reimagine visuals
+            # and typography style, but must NOT move, resize, or remove elements.
             parts = [
-                "You are a creative banner designer. I'm providing a rough reference layout.",
+                "You are a creative banner designer. I'm providing a reference layout image.",
                 f"Canvas: {canvas.get('width', 1200)}x{canvas.get('height', 630)} pixels.",
                 f"Background: {canvas.get('background_color', '#FFFFFF')}.",
-                "Use the reference image and the text on the canvas ONLY as rough creative guidelines. "
-                "You are free to reimagine the layout, replace image subjects, rewrite or significantly "
-                "alter the text to better fit the overall creative direction. "
-                "Prioritise a visually striking, cohesive result over strict fidelity.",
+                "CRITICAL LAYOUT RULES — you MUST obey these unconditionally:",
+                "1. Preserve the exact X/Y position and bounding box of EVERY element from the reference.",
+                "2. Do not move, resize, add, or remove any element.",
+                "3. The spatial composition is FIXED — treat it as an immovable constraint.",
+                "Within those constraints you are free to: improve colours, lighting, shadows, gradients, "
+                "textures, image realism, and overall visual polish. Rewrite text only when a user "
+                "creative direction explicitly asks for new copy.",
             ]
         else:
             # Manual mode: strict layout preservation

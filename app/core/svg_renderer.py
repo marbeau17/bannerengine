@@ -16,7 +16,12 @@ class SvgRenderer:
     """Renders a BannerTemplate with slot values into an SVG string."""
 
     def render(self, template: BannerTemplate, slot_values: dict[str, Any]) -> str:
-        """Generate a complete SVG string for the given template and values."""
+        """Generate a complete SVG string for the given template and values.
+
+        Respects three session keys that extend / reorder the base template:
+        - ``_order``         — list of slot IDs controlling draw order (z-index)
+        - ``_custom_layers`` — list of freeform layer dicts (rect/circle/text/image)
+        """
         try:
             width = template.meta.width
             height = template.meta.height
@@ -32,9 +37,22 @@ class SvgRenderer:
             self._defs = ET.SubElement(svg, "defs")
             self._render_background(svg, template.design, width, height)
 
-            for slot in template.slots:
+            # Apply custom draw order (Phase 1)
+            slots = list(template.slots)
+            order = slot_values.get("_order")
+            if order and isinstance(order, list):
+                order_map = {sid: i for i, sid in enumerate(order)}
+                slots.sort(key=lambda s: order_map.get(s.id, len(order)))
+
+            for slot in slots:
                 value = slot_values.get(slot.id)
                 self._render_slot(svg, slot, value, template)
+
+            # Render freeform custom layers on top (Phase 2)
+            custom_layers = slot_values.get("_custom_layers")
+            if custom_layers and isinstance(custom_layers, list):
+                for layer in custom_layers:
+                    self._render_custom_layer(svg, layer, width, height)
 
             return ET.tostring(svg, encoding="unicode", xml_declaration=False)
         except GenerationError:
@@ -81,7 +99,7 @@ class SvgRenderer:
         w, h = template.meta.width, template.meta.height
 
         x_pct, y_pct, w_pct, h_pct = self._effective_geometry(slot, value)
-        slot_group = ET.SubElement(svg, "g", attrib={
+        slot_attribs: dict[str, str] = {
             "id": slot.id,
             "data-name": slot.id,
             "class": "draggable-slot",
@@ -91,7 +109,17 @@ class SvgRenderer:
             "data-y": f"{y_pct:.4f}",
             "data-w": f"{w_pct:.4f}",
             "data-h": f"{h_pct:.4f}",
-        })
+        }
+        # Phase 2: apply per-slot opacity if set
+        if isinstance(value, dict):
+            opacity_raw = value.get("opacity")
+            if opacity_raw is not None:
+                try:
+                    opacity_val = max(0.0, min(1.0, float(opacity_raw)))
+                    slot_attribs["opacity"] = f"{opacity_val:.2f}"
+                except (ValueError, TypeError):
+                    pass
+        slot_group = ET.SubElement(svg, "g", attrib=slot_attribs)
         normalised = self._normalise_value(slot, value)
 
         # Check for AI prompt with no image yet
@@ -310,6 +338,88 @@ class SvgRenderer:
             "text-anchor": "middle", "dominant-baseline": "central",
         })
         text_elem.text = label
+
+    def _render_custom_layer(self, svg: ET.Element, layer: dict, w: int, h: int) -> None:
+        """Render a freeform custom layer (rect / circle / text / image). Phase 2."""
+        layer_id = layer.get("id", "custom_unknown")
+        layer_type = layer.get("type", "rect")
+        x = self._calc_px(float(layer.get("x", 10)), w)
+        y = self._calc_px(float(layer.get("y", 10)), h)
+        lw = self._calc_px(float(layer.get("width", 30)), w)
+        lh = self._calc_px(float(layer.get("height", 20)), h)
+
+        opacity_raw = layer.get("opacity", 1.0)
+        try:
+            opacity = max(0.0, min(1.0, float(opacity_raw)))
+        except (ValueError, TypeError):
+            opacity = 1.0
+
+        g_attribs: dict[str, str] = {
+            "id": layer_id,
+            "class": "draggable-slot custom-layer",
+            "data-slot-id": layer_id,
+            "data-slot-type": layer_type,
+            "data-x": f"{layer.get('x', 10):.4f}",
+            "data-y": f"{layer.get('y', 10):.4f}",
+            "data-w": f"{layer.get('width', 30):.4f}",
+            "data-h": f"{layer.get('height', 20):.4f}",
+            "opacity": f"{opacity:.2f}",
+        }
+        g = ET.SubElement(svg, "g", attrib=g_attribs)
+
+        if layer_type == "rect":
+            fill = layer.get("fill", "#4f46e5")
+            ET.SubElement(g, "rect", attrib={
+                "x": f"{x:.1f}", "y": f"{y:.1f}",
+                "width": f"{lw:.1f}", "height": f"{lh:.1f}",
+                "fill": fill,
+            })
+        elif layer_type == "circle":
+            fill = layer.get("fill", "#059669")
+            cx = x + lw / 2
+            cy = y + lh / 2
+            r = min(lw, lh) / 2
+            ET.SubElement(g, "circle", attrib={
+                "cx": f"{cx:.1f}", "cy": f"{cy:.1f}", "r": f"{r:.1f}",
+                "fill": fill,
+            })
+        elif layer_type == "text":
+            color = layer.get("color", "#111111")
+            font_size = layer.get("font_size", "24")
+            font_size_num = "".join(c for c in str(font_size) if c.isdigit() or c == ".") or "24"
+            text_el = ET.SubElement(g, "text", attrib={
+                "x": f"{x + lw / 2:.1f}", "y": f"{y + lh / 2:.1f}",
+                "font-family": _DEFAULT_FONT_FAMILY,
+                "font-size": font_size_num,
+                "fill": color,
+                "text-anchor": "middle",
+                "dominant-baseline": "central",
+                "data-content": "true",
+            })
+            text_el.text = str(layer.get("text", "Text Layer"))
+        elif layer_type == "image":
+            source_url = layer.get("source_url", "")
+            if source_url:
+                clip_id = f"clip-{layer_id}"
+                clip_path = ET.SubElement(self._defs, "clipPath", attrib={"id": clip_id})
+                ET.SubElement(clip_path, "rect", attrib={
+                    "x": f"{x:.1f}", "y": f"{y:.1f}",
+                    "width": f"{lw:.1f}", "height": f"{lh:.1f}",
+                })
+                ET.SubElement(g, "image", attrib={
+                    "href": source_url,
+                    "x": f"{x:.1f}", "y": f"{y:.1f}",
+                    "width": f"{lw:.1f}", "height": f"{lh:.1f}",
+                    "preserveAspectRatio": "xMidYMid slice",
+                    "clip-path": f"url(#{clip_id})",
+                })
+            else:
+                ET.SubElement(g, "rect", attrib={
+                    "x": f"{x:.1f}", "y": f"{y:.1f}",
+                    "width": f"{lw:.1f}", "height": f"{lh:.1f}",
+                    "fill": "none", "stroke": "#cccccc",
+                    "stroke-width": "1", "stroke-dasharray": "5,5",
+                })
 
     @staticmethod
     def _calc_px(percent: float, total: int) -> float:

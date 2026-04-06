@@ -34,6 +34,24 @@ async def home(request: Request):
     )
 
 
+@router.get("/api/pages/slot-editor/{pattern_id}", response_class=HTMLResponse)
+async def slot_editor_partial(request: Request, pattern_id: str):
+    """Return a freshly rendered slot_editor.html partial.
+
+    Called via HTMX hx-trigger=load after the AI blend pipeline completes
+    (Phase 5 OOB sync) so newly generated text appears in the sidebar
+    without a full page reload.
+    """
+    template_service = request.app.state.template_service
+    template = template_service.get_template(pattern_id)
+    slot_values = request.session.get(f"slots_{pattern_id}", {})
+    return templates.TemplateResponse(
+        request,
+        "partials/slot_editor.html",
+        {"slots": template.slots, "slot_values": slot_values, "pattern_id": pattern_id},
+    )
+
+
 @router.get("/editor/{pattern_id}", response_class=HTMLResponse)
 async def editor(request: Request, pattern_id: str):
     """Editor page for a specific banner template.
