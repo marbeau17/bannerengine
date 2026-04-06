@@ -611,6 +611,15 @@ async def export_svg(request: Request, pattern_id: str):
     w, h = template.meta.width, template.meta.height
     svg_string = svg_string.replace("<svg ", f'<svg width="{w}" height="{h}" ', 1)
 
+    # Duplicate href as xlink:href on every <image> element so Adobe Illustrator
+    # (which ignores plain HTML5 href) can locate and render the image data.
+    import re
+    svg_string = re.sub(
+        r'(<image[^>]*?)\bhref="([^"]+)"',
+        r'\1 href="\2" xlink:href="\2"',
+        svg_string,
+    )
+
     return Response(
         content=svg_string.encode("utf-8"),
         media_type="image/svg+xml",
