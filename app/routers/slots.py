@@ -55,20 +55,39 @@ def _set_session_slots(
 # ---------------------------------------------------------------------------
 
 
-@router.patch("/order/{pattern_id}")
+@router.patch("/order/{pattern_id}", response_class=HTMLResponse)
 async def update_slot_order(request: Request, pattern_id: str):
-    """Persist the drag-reordered layer sequence for a template.
+    """Persist the drag-reordered layer sequence and return a re-rendered canvas.
 
     Accepts JSON: ``{"order": ["slot_id_1", "slot_id_2", ...]}``
     The SVG renderer reads ``_order`` from the session and draws slots in
     that sequence, controlling which elements appear in front of others.
+    Returns the updated preview_canvas.html partial so the browser can
+    swap the canvas in-place without a full page reload.
     """
+    template_service = request.app.state.template_service
+    svg_renderer = request.app.state.svg_renderer
+    template = template_service.get_template(pattern_id)
+
     body = await request.json()
     order = body.get("order", [])
     session_slots = _get_session_slots(request, pattern_id)
     session_slots["_order"] = [str(sid) for sid in order]
     _set_session_slots(request, pattern_id, session_slots)
-    return {"status": "ok", "order": order}
+
+    # Apply any design overrides before rendering
+    effective_template = template
+    design_overrides = session_slots.get("_design")
+    if isinstance(design_overrides, dict) and design_overrides.get("background_value"):
+        effective_template = template.model_copy(deep=True)
+        effective_template.design.background_value = design_overrides["background_value"]
+
+    svg_markup = svg_renderer.render(effective_template, session_slots)
+    return templates.TemplateResponse(
+        request,
+        "partials/preview_canvas.html",
+        {"template": effective_template, "pattern_id": pattern_id, "svg_markup": svg_markup},
+    )
 
 
 @router.post("/{pattern_id}/reset")

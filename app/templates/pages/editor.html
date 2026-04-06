@@ -719,8 +719,21 @@
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({order: order})
-          }).then(function(resp) {
-            if (!resp.ok) console.warn('Layer order save failed:', resp.status);
+          })
+          .then(function(resp) {
+            if (!resp.ok) { console.warn('Layer order save failed:', resp.status); return null; }
+            return resp.text();
+          })
+          .then(function(html) {
+            if (!html) return;
+            var canvasEl = document.getElementById('preview-canvas');
+            if (canvasEl) {
+              canvasEl.outerHTML = html;
+              htmx.process(document.body);
+              setTimeout(function() {
+                if (typeof initCanvasInteractions === 'function') initCanvasInteractions();
+              }, 50);
+            }
           });
         }
       });
