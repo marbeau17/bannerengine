@@ -41,12 +41,13 @@ class SvgRenderer:
             width = template.meta.width
             height = template.meta.height
 
+            # No explicit width/height — keep only viewBox so the SVG scales
+            # responsively inside its container on the web preview.
+            # Export callers (export_svg) re-inject width/height for Illustrator.
             svg = ET.Element("svg", attrib={
                 "xmlns": "http://www.w3.org/2000/svg",
                 "xmlns:xlink": "http://www.w3.org/1999/xlink",
                 "viewBox": f"0 0 {width} {height}",
-                "width": str(width),
-                "height": str(height),
             })
 
             self._defs = ET.SubElement(svg, "defs")

@@ -27,20 +27,35 @@ async def start_image_generation(request: Request, pattern_id: str, slot_id: str
     template_service = request.app.state.template_service
     template = template_service.get_template(pattern_id)
 
-    # Find the target slot
+    # Find the target slot — check template slots first, then custom layers
     slot = next((s for s in template.slots if s.id == slot_id), None)
-    if slot is None:
-        raise ValidationError(
-            message=f"Slot '{slot_id}' not found in template '{pattern_id}'.",
-            errors=[f"Unknown slot: {slot_id}"],
-        )
 
-    # Validate slot type supports image generation
-    if slot.type.value not in ("image", "image_or_text"):
-        raise ValidationError(
-            message=f"Slot '{slot_id}' does not support image generation.",
-            errors=[f"Slot type '{slot.type.value}' cannot generate images"],
-        )
+    if slot is None:
+        # Check custom layers in session
+        slot_values = request.session.get(f"slots_{pattern_id}", {})
+        custom_layers = slot_values.get("_custom_layers") or []
+        custom_layer = next((l for l in custom_layers if l.get("id") == slot_id), None)
+        if custom_layer is None or custom_layer.get("type") != "image":
+            raise ValidationError(
+                message=f"Slot '{slot_id}' not found or does not support image generation.",
+                errors=[f"Unknown slot: {slot_id}"],
+            )
+        # Use custom layer dimensions
+        width = max(int(float(custom_layer.get("width", 30)) / 100.0 * template.meta.width), 256)
+        height = max(int(float(custom_layer.get("height", 20)) / 100.0 * template.meta.height), 256)
+        is_custom = True
+    else:
+        # Validate template slot type
+        if slot.type.value not in ("image", "image_or_text"):
+            raise ValidationError(
+                message=f"Slot '{slot_id}' does not support image generation.",
+                errors=[f"Slot type '{slot.type.value}' cannot generate images"],
+            )
+        width = int(slot.width / 100.0 * template.meta.width)
+        height = int(slot.height / 100.0 * template.meta.height)
+        width = max(width, 256)
+        height = max(height, 256)
+        is_custom = False
 
     # Parse form data
     form_data = await request.form()
@@ -54,16 +69,9 @@ async def start_image_generation(request: Request, pattern_id: str, slot_id: str
 
     prompt = str(prompt).strip()
 
-    # Calculate slot dimensions in pixels for generation
-    width = int(slot.width / 100.0 * template.meta.width)
-    height = int(slot.height / 100.0 * template.meta.height)
-    # Ensure minimum dimensions
-    width = max(width, 256)
-    height = max(height, 256)
-
     # Auto-append image requirements to prompt
     extra = [f"\n\nImage requirements: {width}x{height} pixels."]
-    if slot.format_hint:
+    if not is_custom and slot.format_hint:
         extra.append(f"Format: {slot.format_hint}.")
     # Removed slot.description from Context to prevent prompt contamination bias
     # If the user types "cardboard boxes" we don't want "Context: stationery" leaking in.
@@ -230,30 +238,48 @@ async def apply_generated_image(request: Request, pattern_id: str, slot_id: str)
             )
 
     # Update session
-    session_slots = request.session.get(f"slots_{pattern_id}", {})
-    session_slots[slot_id] = {
-        "source_url": final_url,
-        "prompt": str(prompt),
-        "fit": "cover",
-        "transparent_bg": transparent_bg,
-    }
+    session_slots = dict(request.session.get(f"slots_{pattern_id}", {}))
+
+    if slot_id.startswith("custom_"):
+        # Update source_url inside _custom_layers list
+        custom_layers = list(session_slots.get("_custom_layers") or [])
+        for layer in custom_layers:
+            if layer.get("id") == slot_id:
+                layer["source_url"] = final_url
+                break
+        session_slots["_custom_layers"] = custom_layers
+    else:
+        session_slots[slot_id] = {
+            "source_url": final_url,
+            "prompt": str(prompt),
+            "fit": "cover",
+            "transparent_bg": transparent_bg,
+        }
+
     request.session[f"slots_{pattern_id}"] = session_slots
 
-    # Re-render preview
+    # Re-render preview + sidebar OOB
+    from fastapi.responses import HTMLResponse as _HTMLResponse
     from fastapi.templating import Jinja2Templates
+    from app.routers.pages import _build_sidebar_layers
     templates = Jinja2Templates(directory="app/templates")
 
     svg_markup = svg_renderer.render(template, session_slots)
 
-    response = templates.TemplateResponse(
-        request,
-        "partials/preview_canvas.html",
-        {
-            "template": template,
-            "pattern_id": pattern_id,
-            "svg_markup": svg_markup,
-        },
+    canvas_html = templates.env.get_template("partials/preview_canvas.html").render(
+        request=request,
+        template=template,
+        pattern_id=pattern_id,
+        svg_markup=svg_markup,
     )
+    sidebar_layers, _ = _build_sidebar_layers(template, session_slots)
+    sidebar_html = templates.env.get_template("partials/layer_sidebar.html").render(
+        request=request,
+        sidebar_layers=sidebar_layers,
+        pattern_id=pattern_id,
+    )
+
+    response = _HTMLResponse(content=canvas_html + sidebar_html)
     # Let the frontend know if background removal failed so it can warn the user
     if rembg_failed:
         response.headers["X-Rembg-Failed"] = "true"

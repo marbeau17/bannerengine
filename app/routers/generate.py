@@ -605,6 +605,12 @@ async def export_svg(request: Request, pattern_id: str):
     # producing a fully self-contained SVG that opens in Adobe Illustrator offline.
     svg_string = svg_renderer.render(template, slot_values, embed_images=True)
 
+    # Re-inject explicit width/height for Illustrator / print-ready exports.
+    # The renderer omits them so the web preview SVG scales responsively, but
+    # design tools require absolute pixel dimensions to interpret the canvas size.
+    w, h = template.meta.width, template.meta.height
+    svg_string = svg_string.replace("<svg ", f'<svg width="{w}" height="{h}" ', 1)
+
     return Response(
         content=svg_string.encode("utf-8"),
         media_type="image/svg+xml",

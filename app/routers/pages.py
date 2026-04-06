@@ -130,6 +130,7 @@ async def editor(request: Request, pattern_id: str):
         svg_markup = None
 
     sidebar_layers, display_slots = _build_sidebar_layers(template, slot_values)
+    custom_layers = list(slot_values.get("_custom_layers") or [])
 
     return templates.TemplateResponse(
         request,
@@ -139,6 +140,7 @@ async def editor(request: Request, pattern_id: str):
             "pattern_id": pattern_id,
             "slots": display_slots,
             "sidebar_layers": sidebar_layers,
+            "custom_layers": custom_layers,
             "slot_values": slot_values,
             "svg_markup": svg_markup,
         },

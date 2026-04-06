@@ -31,17 +31,28 @@ def _save_custom_layers(request: Request, pattern_id: str, layers: list) -> None
 
 
 def _render_canvas(request: Request, pattern_id: str) -> HTMLResponse:
-    """Re-render the preview canvas with current slot + custom layer state."""
+    """Re-render the preview canvas + sidebar OOB with current slot + custom layer state."""
+    from app.routers.pages import _build_sidebar_layers
+
     template_service = request.app.state.template_service
     svg_renderer = request.app.state.svg_renderer
     template = template_service.get_template(pattern_id)
     slot_values = dict(request.session.get(f"slots_{pattern_id}", {}))
     svg_markup = svg_renderer.render(template, slot_values)
-    return templates.TemplateResponse(
-        request,
-        "partials/preview_canvas.html",
-        {"template": template, "pattern_id": pattern_id, "svg_markup": svg_markup},
+
+    canvas_html = templates.env.get_template("partials/preview_canvas.html").render(
+        request=request,
+        template=template,
+        pattern_id=pattern_id,
+        svg_markup=svg_markup,
     )
+    sidebar_layers, _ = _build_sidebar_layers(template, slot_values)
+    sidebar_html = templates.env.get_template("partials/layer_sidebar.html").render(
+        request=request,
+        sidebar_layers=sidebar_layers,
+        pattern_id=pattern_id,
+    )
+    return HTMLResponse(content=canvas_html + sidebar_html)
 
 
 @router.post("/{pattern_id}", response_class=HTMLResponse)
@@ -96,7 +107,7 @@ async def update_layer(request: Request, pattern_id: str, layer_id: str):
     _NUMERIC_FIELDS = {"x", "y", "width", "height", "opacity"}
     for layer in layers:
         if layer["id"] == layer_id:
-            for field in ("fill", "color", "opacity", "text", "font_size", "x", "y", "width", "height"):
+            for field in ("fill", "color", "opacity", "text", "font_size", "source_url", "x", "y", "width", "height"):
                 val = form.get(field)
                 if val is not None:
                     layer[field] = float(val) if field in _NUMERIC_FIELDS else str(val)

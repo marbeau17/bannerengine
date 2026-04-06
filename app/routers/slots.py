@@ -135,11 +135,21 @@ async def hide_slot(request: Request, pattern_id: str, slot_id: str):
         effective_template.design.background_value = design_overrides["background_value"]
 
     svg_markup = svg_renderer.render(effective_template, session_slots)
-    return templates.TemplateResponse(
-        request,
-        "partials/preview_canvas.html",
-        {"template": effective_template, "pattern_id": pattern_id, "svg_markup": svg_markup},
+
+    from app.routers.pages import _build_sidebar_layers
+    canvas_html = templates.env.get_template("partials/preview_canvas.html").render(
+        request=request,
+        template=effective_template,
+        pattern_id=pattern_id,
+        svg_markup=svg_markup,
     )
+    sidebar_layers, _ = _build_sidebar_layers(effective_template, session_slots)
+    sidebar_html = templates.env.get_template("partials/layer_sidebar.html").render(
+        request=request,
+        sidebar_layers=sidebar_layers,
+        pattern_id=pattern_id,
+    )
+    return HTMLResponse(content=canvas_html + sidebar_html)
 
 
 @router.patch("/{pattern_id}/{slot_id}", response_class=HTMLResponse)
