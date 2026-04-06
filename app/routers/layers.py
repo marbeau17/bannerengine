@@ -31,8 +31,8 @@ def _save_custom_layers(request: Request, pattern_id: str, layers: list) -> None
 
 
 def _render_canvas(request: Request, pattern_id: str) -> HTMLResponse:
-    """Re-render the preview canvas + sidebar OOB with current slot + custom layer state."""
-    from app.routers.pages import _build_sidebar_layers
+    """Re-render canvas + OOB left sidebar + OOB right slot-editor-panel."""
+    from app.routers.pages import _build_sidebar_layers, _flatten_slot_values
 
     template_service = request.app.state.template_service
     svg_renderer = request.app.state.svg_renderer
@@ -46,13 +46,30 @@ def _render_canvas(request: Request, pattern_id: str) -> HTMLResponse:
         pattern_id=pattern_id,
         svg_markup=svg_markup,
     )
-    sidebar_layers, _ = _build_sidebar_layers(template, slot_values)
+
+    sidebar_layers, display_slots = _build_sidebar_layers(template, slot_values)
+    flat_slot_values = _flatten_slot_values(slot_values)
+
+    # OOB 1: left layer list
     sidebar_html = templates.env.get_template("partials/layer_sidebar.html").render(
         request=request,
         sidebar_layers=sidebar_layers,
         pattern_id=pattern_id,
     )
-    return HTMLResponse(content=canvas_html + sidebar_html)
+
+    # OOB 2: right slot-editor-panel — wrap in a div with the panel's id so
+    # HTMX (and applyCanvasResponse) knows where to swap it
+    slot_editor_inner = templates.env.get_template("partials/slot_editor.html").render(
+        request=request,
+        slots=display_slots,
+        slot_values=flat_slot_values,
+        pattern_id=pattern_id,
+    )
+    slot_editor_oob = (
+        f'<div id="slot-editor-panel" hx-swap-oob="true">{slot_editor_inner}</div>'
+    )
+
+    return HTMLResponse(content=canvas_html + sidebar_html + slot_editor_oob)
 
 
 @router.post("/{pattern_id}", response_class=HTMLResponse)
@@ -110,7 +127,14 @@ async def update_layer(request: Request, pattern_id: str, layer_id: str):
             for field in ("fill", "color", "opacity", "text", "font_size", "source_url", "x", "y", "width", "height"):
                 val = form.get(field)
                 if val is not None:
-                    layer[field] = float(val) if field in _NUMERIC_FIELDS else str(val)
+                    if field in _NUMERIC_FIELDS:
+                        fval = float(val)
+                        # Opacity arrives as 0-100 from the range slider — normalise to 0.0-1.0
+                        if field == "opacity" and fval > 1.0:
+                            fval = round(fval / 100.0, 2)
+                        layer[field] = fval
+                    else:
+                        layer[field] = str(val)
             # Map `content` (slot editor convention) → `text` for custom text layers
             content_val = form.get("content")
             if content_val is not None:

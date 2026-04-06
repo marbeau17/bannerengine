@@ -1,0 +1,20 @@
+{% set cv = current_value if current_value is mapping else {} %}
+{% set slot_patch_url = '/api/layers/' + pattern_id + '/' + current_slot.id %}
+<div class="space-y-2">
+  <!-- Fill color -->
+  <div class="flex items-center gap-2">
+    <label class="text-[11px] text-gray-500 w-16 shrink-0">塗り色</label>
+    <input
+      type="color"
+      name="fill"
+      value="{{ cv.get('fill', '#4f46e5') }}"
+      class="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
+      hx-patch="{{ slot_patch_url }}"
+      hx-target="#preview-canvas"
+      hx-swap="outerHTML"
+      hx-trigger="input changed delay:300ms"
+      hx-sync="body:queue"
+    >
+    <span class="text-[10px] text-gray-400">{{ cv.get('fill', '#4f46e5') }}</span>
+  </div>
+</div>

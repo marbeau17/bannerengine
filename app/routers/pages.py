@@ -70,22 +70,27 @@ def _build_sidebar_layers(template, slot_values: dict) -> tuple[list, list]:
                 "label": layer.get("text", layer.get("label", layer["id"])),
             })
 
-    # display_slots: template slots (non-hidden) + editable custom layers, in sidebar order
-    # Custom image and text layers are synthesized as Slot objects with is_custom=True
-    # so they feed into the right-side slot editor tab using the same templates.
-    _EDITABLE_CUSTOM_TYPES = {"image", "text"}
+    # display_slots: template slots (non-hidden) + all editable custom layers, in sidebar order
+    # Custom layers are synthesized as Slot objects with is_custom=True so they feed into
+    # the right-side slot editor tab using the same Jinja templates.
+    _SLOT_TYPE_MAP = {
+        "image": SlotType.IMAGE,
+        "text": SlotType.TEXT,
+        "rect": SlotType.RECT,
+        "circle": SlotType.CIRCLE,
+    }
     display_slots: list[Slot] = []
     for entry in sidebar_layers:
         if entry["kind"] == "slot":
             slot = slot_map.get(entry["id"])
             if slot:
                 display_slots.append(slot)
-        elif entry["kind"] == "custom" and entry["type_value"] in _EDITABLE_CUSTOM_TYPES:
+        elif entry["kind"] == "custom" and entry["type_value"] in _SLOT_TYPE_MAP:
             layer = custom_map.get(entry["id"])
             if not layer:
                 continue
             layer_type = layer.get("type", "rect")
-            slot_type = SlotType.IMAGE if layer_type == "image" else SlotType.TEXT
+            slot_type = _SLOT_TYPE_MAP.get(layer_type, SlotType.RECT)
             synth = Slot(
                 id=layer["id"],
                 type=slot_type,
@@ -135,11 +140,14 @@ def _flatten_slot_values(slot_values: dict) -> dict:
         if lid and lid not in flat:
             # Expose as a value dict matching what slot editor templates expect
             layer_type = layer.get("type", "rect")
+            opacity = layer.get("opacity", 1.0)
             if layer_type == "text":
                 flat[lid] = {"text": layer.get("text", ""), "color": layer.get("color", "#111111"),
-                             "font_size": layer.get("font_size", "24"), "opacity": layer.get("opacity", 1.0)}
+                             "font_size": layer.get("font_size", "24"), "opacity": opacity}
             elif layer_type == "image":
-                flat[lid] = {"source_url": layer.get("source_url", ""), "opacity": layer.get("opacity", 1.0)}
+                flat[lid] = {"source_url": layer.get("source_url", ""), "opacity": opacity}
+            elif layer_type in ("rect", "circle"):
+                flat[lid] = {"fill": layer.get("fill", "#4f46e5"), "opacity": opacity}
     return flat
 
 

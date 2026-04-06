@@ -13,6 +13,8 @@ class SlotType(str, Enum):
     TEXT = "text"
     BUTTON = "button"
     IMAGE_OR_TEXT = "image_or_text"
+    RECT = "rect"
+    CIRCLE = "circle"
 
 
 class TemplateMeta(BaseModel):

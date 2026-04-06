@@ -9,7 +9,11 @@
         <span class="text-[10px] font-semibold uppercase bg-red-100 text-red-600 px-1.5 py-0.5 rounded">必須</span>
         {% endif %}
       </div>
+      {% if slot.is_custom %}
+      <span class="text-[10px] font-medium uppercase bg-indigo-100 text-indigo-500 px-1.5 py-0.5 rounded">カスタム · {{ slot.type.value }}</span>
+      {% else %}
       <span class="text-[10px] font-medium uppercase bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{{ slot.type.value }}</span>
+      {% endif %}
     </div>
 
     {% if slot.description %}
@@ -28,7 +32,8 @@
       </div>
     </div>
 
-    <!-- Phase 2: Opacity slider (applies to all slot types) -->
+    <!-- Opacity slider (all slot types; routes to /api/layers/ for custom layers) -->
+    {% set opacity_patch_url = ('/api/layers/' + pattern_id + '/' + slot.id) if slot.is_custom else ('/api/slots/' + pattern_id + '/' + slot.id) %}
     <div class="flex items-center gap-2 mb-2">
       <label class="text-[11px] text-gray-500 w-16 shrink-0">透明度</label>
       <input
@@ -36,7 +41,7 @@
         min="0" max="100" step="1"
         value="{{ ((slot_values.get(slot.id, {}).get('opacity', 1.0) if slot_values.get(slot.id) is mapping else 1.0) * 100) | int }}"
         class="flex-1 h-1.5 accent-indigo-600"
-        hx-patch="/api/slots/{{ pattern_id }}/{{ slot.id }}"
+        hx-patch="{{ opacity_patch_url }}"
         hx-target="#preview-canvas"
         hx-swap="outerHTML"
         hx-trigger="input changed delay:200ms"
@@ -68,6 +73,11 @@
       {% elif slot.type.value == 'image_or_text' %}
         {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
           {% include "components/slot_types/image_or_text_slot.html" %}
+          {% include "components/slot_position_editor.html" %}
+        {% endwith %}
+      {% elif slot.type.value in ('rect', 'circle') %}
+        {% with current_slot=slot, current_value=slot_values.get(slot.id, {}) %}
+          {% include "components/slot_types/shape_slot.html" %}
           {% include "components/slot_position_editor.html" %}
         {% endwith %}
       {% endif %}
