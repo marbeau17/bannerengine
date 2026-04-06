@@ -137,29 +137,41 @@ async def upload_asset(request: Request):
 
     # If slot_id and pattern_id provided, update the slot and return preview
     if slot_id and pattern_id:
-        session_slots = request.session.get(f"slots_{pattern_id}", {})
-        session_slots[slot_id] = {
-            "source_url": file_url,
-            "prompt": session_slots.get(slot_id, {}).get("prompt", "") if isinstance(session_slots.get(slot_id), dict) else "",
-            "fit": "cover",
-        }
+        session_slots = dict(request.session.get(f"slots_{pattern_id}", {}))
+
+        if slot_id.startswith("custom_"):
+            # Write source_url into the matching entry in _custom_layers
+            custom_layers = list(session_slots.get("_custom_layers") or [])
+            for layer in custom_layers:
+                if layer.get("id") == slot_id:
+                    layer["source_url"] = file_url
+                    break
+            session_slots["_custom_layers"] = custom_layers
+        else:
+            session_slots[slot_id] = {
+                "source_url": file_url,
+                "prompt": session_slots.get(slot_id, {}).get("prompt", "") if isinstance(session_slots.get(slot_id), dict) else "",
+                "fit": "cover",
+            }
+
         request.session[f"slots_{pattern_id}"] = session_slots
 
-        # Re-render preview
+        # Re-render preview + sidebar OOB
+        from fastapi.responses import HTMLResponse as _HTMLResponse
+        from app.routers.pages import _build_sidebar_layers
         template_service = request.app.state.template_service
         svg_renderer = request.app.state.svg_renderer
         template = template_service.get_template(pattern_id)
         svg_markup = svg_renderer.render(template, session_slots)
 
-        return templates.TemplateResponse(
-            request,
-            "partials/preview_canvas.html",
-            {
-                "template": template,
-                "pattern_id": pattern_id,
-                "svg_markup": svg_markup,
-            },
+        canvas_html = templates.env.get_template("partials/preview_canvas.html").render(
+            request=request, template=template, pattern_id=pattern_id, svg_markup=svg_markup,
         )
+        sidebar_layers, _ = _build_sidebar_layers(template, session_slots)
+        sidebar_html = templates.env.get_template("partials/layer_sidebar.html").render(
+            request=request, sidebar_layers=sidebar_layers, pattern_id=pattern_id,
+        )
+        return _HTMLResponse(content=canvas_html + sidebar_html)
 
     # Fallback: return JSON for non-slot uploads
     return HTMLResponse(

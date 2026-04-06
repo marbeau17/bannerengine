@@ -148,8 +148,7 @@
       return response.text();
     })
     .then(function(html) {
-      var canvas = document.getElementById('preview-canvas');
-      if (canvas) canvas.outerHTML = html;
+      applyCanvasResponse(html);
       BannerToast.show('success', '画像をアップロードしました');
     })
     .catch(function(err) {
@@ -257,8 +256,7 @@
       });
     })
     .then(function(result) {
-      var canvas = document.getElementById('preview-canvas');
-      if (canvas) canvas.outerHTML = result.html;
+      applyCanvasResponse(result.html);
       if (result.rembgFailed) {
         BannerToast.show('error', '背景除去に失敗しました。サーバーログを確認してください。');
       } else {

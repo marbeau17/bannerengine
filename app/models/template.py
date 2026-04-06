@@ -79,6 +79,9 @@ class Slot(BaseModel):
     prompt_placeholder: Optional[str] = None  # Hint text for AI prompt input
     allow_ai_generation: bool = True  # Whether this slot supports AI image generation
 
+    # Custom layer flag — True for layers synthesized from _custom_layers session data
+    is_custom: bool = False
+
 
 class BannerTemplate(BaseModel):
     """Complete banner template parsed from XML."""

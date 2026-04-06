@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.core.exceptions import TemplateNotFoundError
+from app.models.template import Slot, SlotType
 
 router = APIRouter(tags=["pages"])
 
@@ -69,9 +70,34 @@ def _build_sidebar_layers(template, slot_values: dict) -> tuple[list, list]:
                 "label": layer.get("text", layer.get("label", layer["id"])),
             })
 
-    # display_slots: template slots only, non-hidden, in sidebar order
-    sidebar_slot_ids = [l["id"] for l in sidebar_layers if l["kind"] == "slot"]
-    display_slots = [slot_map[sid] for sid in sidebar_slot_ids if sid in slot_map]
+    # display_slots: template slots (non-hidden) + editable custom layers, in sidebar order
+    # Custom image and text layers are synthesized as Slot objects with is_custom=True
+    # so they feed into the right-side slot editor tab using the same templates.
+    _EDITABLE_CUSTOM_TYPES = {"image", "text"}
+    display_slots: list[Slot] = []
+    for entry in sidebar_layers:
+        if entry["kind"] == "slot":
+            slot = slot_map.get(entry["id"])
+            if slot:
+                display_slots.append(slot)
+        elif entry["kind"] == "custom" and entry["type_value"] in _EDITABLE_CUSTOM_TYPES:
+            layer = custom_map.get(entry["id"])
+            if not layer:
+                continue
+            layer_type = layer.get("type", "rect")
+            slot_type = SlotType.IMAGE if layer_type == "image" else SlotType.TEXT
+            synth = Slot(
+                id=layer["id"],
+                type=slot_type,
+                x=float(layer.get("x", 10)),
+                y=float(layer.get("y", 10)),
+                width=float(layer.get("width", 30)),
+                height=float(layer.get("height", 20)),
+                description="",
+                required=False,
+                is_custom=True,
+            )
+            display_slots.append(synth)
 
     return sidebar_layers, display_slots
 
@@ -93,6 +119,30 @@ async def home(request: Request):
     )
 
 
+def _flatten_slot_values(slot_values: dict) -> dict:
+    """Return a copy of slot_values with custom layer data keyed by layer ID at top level.
+
+    The slot editor partial looks up values via ``slot_values.get(slot.id, {})``.
+    For synthesized custom Slot objects their id is e.g. ``custom_abc123``, but the
+    actual data lives inside ``slot_values["_custom_layers"]``.  This function
+    merges those entries up so the template can find them with a plain dict lookup.
+    """
+    flat = dict(slot_values)
+    for layer in slot_values.get("_custom_layers") or []:
+        if not isinstance(layer, dict):
+            continue
+        lid = layer.get("id")
+        if lid and lid not in flat:
+            # Expose as a value dict matching what slot editor templates expect
+            layer_type = layer.get("type", "rect")
+            if layer_type == "text":
+                flat[lid] = {"text": layer.get("text", ""), "color": layer.get("color", "#111111"),
+                             "font_size": layer.get("font_size", "24"), "opacity": layer.get("opacity", 1.0)}
+            elif layer_type == "image":
+                flat[lid] = {"source_url": layer.get("source_url", ""), "opacity": layer.get("opacity", 1.0)}
+    return flat
+
+
 @router.get("/api/pages/slot-editor/{pattern_id}", response_class=HTMLResponse)
 async def slot_editor_partial(request: Request, pattern_id: str):
     """Return a freshly rendered slot_editor.html partial (OOB sync after AI pipeline)."""
@@ -101,11 +151,12 @@ async def slot_editor_partial(request: Request, pattern_id: str):
     slot_values = request.session.get(f"slots_{pattern_id}", {})
 
     _, display_slots = _build_sidebar_layers(template, slot_values)
+    flat_slot_values = _flatten_slot_values(slot_values)
 
     return templates.TemplateResponse(
         request,
         "partials/slot_editor.html",
-        {"slots": display_slots, "slot_values": slot_values, "pattern_id": pattern_id},
+        {"slots": display_slots, "slot_values": flat_slot_values, "pattern_id": pattern_id},
     )
 
 
@@ -131,6 +182,7 @@ async def editor(request: Request, pattern_id: str):
 
     sidebar_layers, display_slots = _build_sidebar_layers(template, slot_values)
     custom_layers = list(slot_values.get("_custom_layers") or [])
+    flat_slot_values = _flatten_slot_values(slot_values)
 
     return templates.TemplateResponse(
         request,
@@ -141,7 +193,7 @@ async def editor(request: Request, pattern_id: str):
             "slots": display_slots,
             "sidebar_layers": sidebar_layers,
             "custom_layers": custom_layers,
-            "slot_values": slot_values,
+            "slot_values": flat_slot_values,
             "svg_markup": svg_markup,
         },
     )

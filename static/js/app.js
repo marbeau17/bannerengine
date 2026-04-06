@@ -746,12 +746,7 @@ var CanvasDrag = (function () {
         return r.ok ? r.text() : Promise.reject("HTTP " + r.status);
       })
       .then(function (html) {
-        var canvas = document.getElementById("preview-canvas");
-        if (canvas) {
-          canvas.outerHTML = html;
-          htmx.process(document.body);
-          setTimeout(initCanvasInteractions, 50);
-        }
+        applyCanvasResponse(html);
       })
       .catch(function (err) {
         console.error("CanvasDrag: position sync failed:", err);
@@ -890,18 +885,14 @@ var CanvasTextEdit = (function () {
     formData.append("content", text);
     formData.append("slot_type", o.slotType === "button" ? "button" : "text");
 
-    fetch("/api/slots/" + o.patternId + "/" + o.slotId, {
-      method: "PATCH",
-      body: formData,
-    })
+    // Route custom text layers to /api/layers/ — /api/slots/ only handles template slots
+    var saveUrl = o.slotId.startsWith("custom_")
+      ? "/api/layers/" + o.patternId + "/" + o.slotId
+      : "/api/slots/" + o.patternId + "/" + o.slotId;
+    fetch(saveUrl, { method: "PATCH", body: formData })
       .then(function (r) { return r.ok ? r.text() : Promise.reject("HTTP " + r.status); })
       .then(function (html) {
-        var canvas = document.getElementById("preview-canvas");
-        if (canvas) {
-          canvas.outerHTML = html;
-          htmx.process(document.body);
-          setTimeout(initCanvasInteractions, 50);
-        }
+        applyCanvasResponse(html);
       })
       .catch(function (err) {
         console.error("CanvasTextEdit: save failed:", err);
@@ -1117,19 +1108,15 @@ var CanvasSelect = (function () {
     fetch(resizeUrl, { method: "PATCH", body: fd })
       .then(function (res) { return res.ok ? res.text() : Promise.reject("HTTP " + res.status); })
       .then(function (html) {
-        var canvas = document.getElementById("preview-canvas");
-        if (!canvas) return;
-        canvas.outerHTML = html;
-        htmx.process(document.body);
+        applyCanvasResponse(html);
+        // Re-select the resized slot so the user can keep adjusting
         setTimeout(function () {
-          initCanvasInteractions();
-          // Re-select the resized slot so the user can keep adjusting
           var newCanvas = document.getElementById("preview-canvas");
           if (!newCanvas) return;
           var svg = newCanvas.querySelector("svg");
           var newGroup = svg && svg.querySelector('g[data-slot-id="' + r.slotId + '"]');
           if (newGroup) selectGroup(newGroup, svg, r.patternId);
-        }, 50);
+        }, 60);
       })
       .catch(function (err) {
         console.error("CanvasSelect: resize save failed:", err);

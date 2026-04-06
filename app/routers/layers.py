@@ -111,6 +111,10 @@ async def update_layer(request: Request, pattern_id: str, layer_id: str):
                 val = form.get(field)
                 if val is not None:
                     layer[field] = float(val) if field in _NUMERIC_FIELDS else str(val)
+            # Map `content` (slot editor convention) → `text` for custom text layers
+            content_val = form.get("content")
+            if content_val is not None:
+                layer["text"] = str(content_val)
             break
     _save_custom_layers(request, pattern_id, layers)
     return _render_canvas(request, pattern_id)
