@@ -601,9 +601,9 @@ async def export_svg(request: Request, pattern_id: str):
         template = template.model_copy(deep=True)
         template.design.background_value = design_overrides["background_value"]
 
-    svg_string = svg_renderer.render(template, slot_values)
-    # Embed local images so SVG is self-contained
-    svg_string = _embed_local_images(svg_string)
+    # embed_images=True converts all local /static/… hrefs to Base64 data URIs,
+    # producing a fully self-contained SVG that opens in Adobe Illustrator offline.
+    svg_string = svg_renderer.render(template, slot_values, embed_images=True)
 
     return Response(
         content=svg_string.encode("utf-8"),

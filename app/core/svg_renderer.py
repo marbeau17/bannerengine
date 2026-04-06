@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import mimetypes
+import os
 import xml.etree.ElementTree as ET
 from typing import Any
 
@@ -15,13 +18,25 @@ _DEFAULT_FONT_FAMILY = "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Ari
 class SvgRenderer:
     """Renders a BannerTemplate with slot values into an SVG string."""
 
-    def render(self, template: BannerTemplate, slot_values: dict[str, Any]) -> str:
+    def render(
+        self,
+        template: BannerTemplate,
+        slot_values: dict[str, Any],
+        embed_images: bool = False,
+    ) -> str:
         """Generate a complete SVG string for the given template and values.
+
+        Args:
+            embed_images: When True, resolve local ``/static/…`` image URLs to
+                Base64 ``data:`` URIs so the SVG is fully self-contained and
+                opens correctly in offline tools like Adobe Illustrator.
+                Defaults to False to keep the live web preview lightweight.
 
         Respects three session keys that extend / reorder the base template:
         - ``_order``         — list of slot IDs controlling draw order (z-index)
         - ``_custom_layers`` — list of freeform layer dicts (rect/circle/text/image)
         """
+        self._embed_images = embed_images
         try:
             width = template.meta.width
             height = template.meta.height
@@ -80,7 +95,7 @@ class SvgRenderer:
                 ET.SubElement(bg_group, "rect", attrib={"x": "0", "y": "0", "width": str(w), "height": str(h), "fill": parts[0]})
         elif bg_type == "image" and bg_value:
             ET.SubElement(bg_group, "image", attrib={
-                "href": bg_value, "x": "0", "y": "0",
+                "href": self._resolve_href(bg_value), "x": "0", "y": "0",
                 "width": str(w), "height": str(h), "preserveAspectRatio": "xMidYMid slice",
             })
         else:
@@ -206,7 +221,7 @@ class SvgRenderer:
             "x": f"{x:.1f}", "y": f"{y:.1f}", "width": f"{sw:.1f}", "height": f"{sh:.1f}",
         })
 
-        image_url = value if isinstance(value, str) else str(value)
+        image_url = self._resolve_href(value if isinstance(value, str) else str(value))
         ET.SubElement(svg, "image", attrib={
             "href": image_url, "x": f"{x:.1f}", "y": f"{y:.1f}",
             "width": f"{sw:.1f}", "height": f"{sh:.1f}",
@@ -410,7 +425,7 @@ class SvgRenderer:
                     "width": f"{lw:.1f}", "height": f"{lh:.1f}",
                 })
                 ET.SubElement(g, "image", attrib={
-                    "href": source_url,
+                    "href": self._resolve_href(source_url),
                     "x": f"{x:.1f}", "y": f"{y:.1f}",
                     "width": f"{lw:.1f}", "height": f"{lh:.1f}",
                     "preserveAspectRatio": "xMidYMid slice",
@@ -423,6 +438,26 @@ class SvgRenderer:
                     "fill": "none", "stroke": "#cccccc",
                     "stroke-width": "1", "stroke-dasharray": "5,5",
                 })
+
+    def _resolve_href(self, url: str) -> str:
+        """Return a Base64 data URI for local assets when embed_images is True.
+
+        Converts ``/static/generated/foo.png`` → ``data:image/png;base64,…``.
+        Falls back to the original URL for remote addresses or missing files.
+        """
+        if not self._embed_images:
+            return url
+        if not url or url.startswith("data:"):
+            return url
+        # Resolve server-relative paths to filesystem paths
+        local_path = url.lstrip("/") if url.startswith("/") else url
+        if not os.path.exists(local_path):
+            return url
+        mime, _ = mimetypes.guess_type(local_path)
+        mime = mime or "image/png"
+        with open(local_path, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode("ascii")
+        return f"data:{mime};base64,{encoded}"
 
     @staticmethod
     def _calc_px(percent: float, total: int) -> float:
