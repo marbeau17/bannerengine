@@ -543,15 +543,21 @@
           method: 'POST',
           body: applyForm
         })
-          .then(function(r) { return r.text(); })
-          .then(function(html) {
+          .then(function(r) {
+            var rembgFailed = r.headers.get('X-Rembg-Failed') === 'true';
+            return r.text().then(function(html) { return { html: html, rembgFailed: rembgFailed }; });
+          })
+          .then(function(result) {
             var canvasEl = document.getElementById('preview-canvas');
             if (canvasEl) {
-              canvasEl.outerHTML = html;
+              canvasEl.outerHTML = result.html;
               htmx.process(document.body);
               setTimeout(function() {
                 if (typeof initCanvasInteractions === 'function') initCanvasInteractions();
               }, 50);
+            }
+            if (result.rembgFailed) {
+              if (typeof BannerToast !== 'undefined') BannerToast.show('error', '背景除去に失敗しました。サーバーログを確認してください。');
             }
             // Lock the slot into generated image state
             setSlotGeneratedImageState(slotId, data.image_url);

@@ -250,11 +250,20 @@
       method: 'POST',
       body: formData,
     })
-    .then(function(response) { return response.text(); })
-    .then(function(html) {
+    .then(function(response) {
+      var rembgFailed = response.headers.get('X-Rembg-Failed') === 'true';
+      return response.text().then(function(html) {
+        return { html: html, rembgFailed: rembgFailed };
+      });
+    })
+    .then(function(result) {
       var canvas = document.getElementById('preview-canvas');
-      if (canvas) canvas.outerHTML = html;
-      BannerToast.show('success', '画像を適用しました');
+      if (canvas) canvas.outerHTML = result.html;
+      if (result.rembgFailed) {
+        BannerToast.show('error', '背景除去に失敗しました。サーバーログを確認してください。');
+      } else {
+        BannerToast.show('success', '画像を適用しました');
+      }
     })
     .catch(function(err) {
       BannerToast.show('error', '画像の適用に失敗しました');

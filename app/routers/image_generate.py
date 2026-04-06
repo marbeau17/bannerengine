@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app.core.exceptions import ValidationError
 
 logger = logging.getLogger("banner_engine")
+# Force uvicorn reload to pick up rembg[cpu] installation
 
 router = APIRouter(prefix="/api/image-generate", tags=["image-generate"])
 
@@ -64,8 +65,8 @@ async def start_image_generation(request: Request, pattern_id: str, slot_id: str
     extra = [f"\n\nImage requirements: {width}x{height} pixels."]
     if slot.format_hint:
         extra.append(f"Format: {slot.format_hint}.")
-    if slot.description:
-        extra.append(f"Context: {slot.description}")
+    # Removed slot.description from Context to prevent prompt contamination bias
+    # If the user types "cardboard boxes" we don't want "Context: stationery" leaking in.
     prompt = prompt + " ".join(extra)
 
     # Start generation
@@ -159,14 +160,18 @@ async def apply_generated_image(request: Request, pattern_id: str, slot_id: str)
 
     final_url = str(image_url)
 
-    # Phase 3: Background removal via rembg when the 透明化 toggle is active
+    # Background removal via rembg when the 透明化 toggle is active
+    rembg_failed = False
     if transparent_bg:
         try:
             import asyncio as _asyncio
             import io as _io
             import os as _os
+            import traceback as _tb
             from rembg import remove as _rembg_remove
             from PIL import Image as _PILImage
+
+            logger.info("rembg: starting background removal for slot %s (url=%s)", slot_id, final_url)
 
             # Load source image bytes
             img_bytes: bytes | None = None
@@ -175,13 +180,18 @@ async def apply_generated_image(request: Request, pattern_id: str, slot_id: str)
                 if _os.path.exists(local_path):
                     with open(local_path, "rb") as f:
                         img_bytes = f.read()
+                    logger.info("rembg: loaded %d bytes from local path %s", len(img_bytes), local_path)
+                else:
+                    logger.error("rembg: local file not found: %s", local_path)
             if img_bytes is None:
                 import httpx as _httpx
+                logger.info("rembg: fetching image over HTTP from %s", final_url)
                 async with _httpx.AsyncClient() as client:
                     resp = await client.get(final_url, timeout=15)
                     img_bytes = resp.content
+                    logger.info("rembg: fetched %d bytes (HTTP %s)", len(img_bytes), resp.status_code)
 
-            # Remove background (runs synchronously in a thread to avoid blocking)
+            # Remove background (runs synchronously in a thread to avoid blocking the event loop)
             def _do_remove(data: bytes) -> bytes:
                 img_in = _PILImage.open(_io.BytesIO(data)).convert("RGBA")
                 result = _rembg_remove(img_in)
@@ -190,6 +200,7 @@ async def apply_generated_image(request: Request, pattern_id: str, slot_id: str)
                 return buf.getvalue()
 
             removed_bytes = await _asyncio.to_thread(_do_remove, img_bytes)
+            logger.info("rembg: background removal produced %d bytes", len(removed_bytes))
 
             # Save the processed PNG alongside other generated assets
             from app.routers.generate import OUTPUT_DIR as _OUT_DIR
@@ -199,10 +210,24 @@ async def apply_generated_image(request: Request, pattern_id: str, slot_id: str)
             with open(out_path, "wb") as f:
                 f.write(removed_bytes)
             final_url = f"/static/generated/{out_filename}"
+            logger.info("rembg: saved transparent PNG → %s", final_url)
+
         except ImportError:
-            logger.warning("rembg not installed — skipping background removal")
+            rembg_failed = True
+            logger.error(
+                "rembg ImportError for slot %s — rembg or onnxruntime not available in this Python environment. "
+                "Run: pip install 'rembg[cpu]' in the active venv, then restart uvicorn.",
+                slot_id,
+            )
         except Exception as exc:
-            logger.warning("Background removal failed for slot %s: %s", slot_id, exc)
+            rembg_failed = True
+            import traceback as _tb
+            logger.error(
+                "rembg failed for slot %s: %s\n%s",
+                slot_id,
+                exc,
+                _tb.format_exc(),
+            )
 
     # Update session
     session_slots = request.session.get(f"slots_{pattern_id}", {})
@@ -220,7 +245,7 @@ async def apply_generated_image(request: Request, pattern_id: str, slot_id: str)
 
     svg_markup = svg_renderer.render(template, session_slots)
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request,
         "partials/preview_canvas.html",
         {
@@ -229,3 +254,7 @@ async def apply_generated_image(request: Request, pattern_id: str, slot_id: str)
             "svg_markup": svg_markup,
         },
     )
+    # Let the frontend know if background removal failed so it can warn the user
+    if rembg_failed:
+        response.headers["X-Rembg-Failed"] = "true"
+    return response
