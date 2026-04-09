@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
-
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -32,12 +30,21 @@ def _save_custom_layers(request: Request, pattern_id: str, layers: list) -> None
 
 def _render_canvas(request: Request, pattern_id: str) -> HTMLResponse:
     """Re-render canvas + OOB left sidebar + OOB right slot-editor-panel."""
+    import logging as _logging
+    _log = _logging.getLogger("banner_engine")
+
     from app.routers.pages import _build_sidebar_layers, _flatten_slot_values
 
     template_service = request.app.state.template_service
     svg_renderer = request.app.state.svg_renderer
     template = template_service.get_template(pattern_id)
     slot_values = dict(request.session.get(f"slots_{pattern_id}", {}))
+
+    cl = slot_values.get("_custom_layers", [])
+    _log.info("_render_canvas: %d custom layers in session", len(cl))
+    if cl:
+        _log.info("_render_canvas: first layer id=%s source_url=%s", cl[0].get("id"), cl[0].get("source_url"))
+
     svg_markup = svg_renderer.render(template, slot_values)
 
     canvas_html = templates.env.get_template("partials/preview_canvas.html").render(
@@ -61,6 +68,7 @@ def _render_canvas(request: Request, pattern_id: str) -> HTMLResponse:
     # HTMX (and applyCanvasResponse) knows where to swap it
     slot_editor_inner = templates.env.get_template("partials/slot_editor.html").render(
         request=request,
+        template=template,
         slots=display_slots,
         slot_values=flat_slot_values,
         pattern_id=pattern_id,
@@ -69,7 +77,16 @@ def _render_canvas(request: Request, pattern_id: str) -> HTMLResponse:
         f'<div id="slot-editor-panel" hx-swap-oob="true">{slot_editor_inner}</div>'
     )
 
-    return HTMLResponse(content=canvas_html + sidebar_html + slot_editor_oob)
+    # OOB 3: AI tab slot list — targets the inner wrapper to avoid resetting
+    # panel-ai's hidden class (which JS controls for tab switching)
+    ai_tab_inner = templates.env.get_template("partials/ai_tab.html").render(
+        request=request,
+        slots=display_slots,
+        pattern_id=pattern_id,
+    )
+    ai_tab_oob = f'<div id="ai-tab-slots" hx-swap-oob="true">{ai_tab_inner}</div>'
+
+    return HTMLResponse(content=canvas_html + sidebar_html + slot_editor_oob + ai_tab_oob)
 
 
 @router.post("/{pattern_id}", response_class=HTMLResponse)
@@ -80,7 +97,17 @@ async def add_layer(request: Request, pattern_id: str):
     if layer_type not in _LAYER_DEFAULTS:
         layer_type = "rect"
 
-    layer_id = f"custom_{uuid.uuid4().hex[:8]}"
+    prefix = "shape" if layer_type in ("rect", "circle") else layer_type
+    existing = _get_custom_layers(request, pattern_id)
+    max_n = 0
+    for l in existing:
+        lid = l.get("id", "")
+        if lid.startswith(f"custom_{prefix}_"):
+            try:
+                max_n = max(max_n, int(lid.split("_")[-1]))
+            except ValueError:
+                pass
+    layer_id = f"custom_{prefix}_{max_n + 1}"
     new_layer: dict = {
         "id": layer_id,
         "type": layer_type,
@@ -89,6 +116,7 @@ async def add_layer(request: Request, pattern_id: str):
         "width": 30.0,
         "height": 20.0,
         "opacity": 1.0,
+        "blend_mode": "normal",
         **_LAYER_DEFAULTS[layer_type],
     }
 
@@ -96,12 +124,12 @@ async def add_layer(request: Request, pattern_id: str):
     layers.append(new_layer)
     _save_custom_layers(request, pattern_id, layers)
 
-    # Auto-stack: inject the new layer at the END of _order so it sorts to the
-    # top of the Photoshop-style sidebar (reversed display = last item shown first).
+    # Auto-stack: insert new layer at the FRONT of _order so it appears at the
+    # top of the Photoshop-style sidebar (_order is front-to-back, index 0 = top).
     slots = dict(request.session.get(f"slots_{pattern_id}", {}))
     order: list = list(slots.get("_order", []))
     if layer_id not in order:
-        order.append(layer_id)
+        order.insert(0, layer_id)
     slots["_order"] = order
     request.session[f"slots_{pattern_id}"] = slots
 
@@ -121,10 +149,10 @@ async def update_layer(request: Request, pattern_id: str, layer_id: str):
     """Edit a freeform layer's properties and return a refreshed preview canvas."""
     form = await request.form()
     layers = _get_custom_layers(request, pattern_id)
-    _NUMERIC_FIELDS = {"x", "y", "width", "height", "opacity"}
+    _NUMERIC_FIELDS = {"x", "y", "width", "height", "opacity", "rotation"}
     for layer in layers:
         if layer["id"] == layer_id:
-            for field in ("fill", "color", "opacity", "text", "font_size", "source_url", "x", "y", "width", "height"):
+            for field in ("fill", "color", "opacity", "blend_mode", "text", "font_size", "source_url", "x", "y", "width", "height", "rotation"):
                 val = form.get(field)
                 if val is not None:
                     if field in _NUMERIC_FIELDS:

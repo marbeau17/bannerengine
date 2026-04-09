@@ -9,30 +9,6 @@
       <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-1">{{ template.meta.pattern_name }}</h2>
       <p class="text-xs text-gray-400 mb-4">{{ template.meta.width }} x {{ template.meta.height }}{{ template.meta.unit }}</p>
 
-      <!-- Design settings -->
-      <details class="mb-4 border border-gray-200 rounded-lg p-2">
-        <summary class="text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer">デザイン設定</summary>
-        <div class="mt-2 space-y-2">
-          <div class="flex items-center gap-2">
-            <label class="text-[11px] text-gray-500 w-12 shrink-0">背景色</label>
-            <input
-              type="color"
-              id="bg-color-picker"
-              name="content"
-              value="{{ slot_values.get('_design', {}).get('background_value', template.design.background_value or '#ffffff') if slot_values.get('_design') is mapping else template.design.background_value or '#ffffff' }}"
-              class="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
-              hx-patch="/api/slots/{{ pattern_id }}/_design"
-              hx-target="#preview-canvas"
-              hx-swap="outerHTML"
-              hx-trigger="input changed delay:300ms"
-              hx-sync="body:queue"
-              hx-vals='{"slot_type": "design"}'
-            >
-            <span class="text-[10px] text-gray-400" id="bg-color-label">{{ slot_values.get('_design', {}).get('background_value', template.design.background_value or '#ffffff') if slot_values.get('_design') is mapping else template.design.background_value or '#ffffff' }}</span>
-          </div>
-        </div>
-      </details>
-
       <!-- Phase 1: drag-to-reorder layer list (SortableJS) -->
       <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center justify-between">
         <span>レイヤー順序</span>
@@ -56,6 +32,8 @@
               <span class="w-5 h-5 flex items-center justify-center rounded bg-orange-100 text-orange-600 text-xs font-bold flex-shrink-0">B</span>
               {% elif layer.type_value == 'image_or_text' %}
               <span class="w-5 h-5 flex items-center justify-center rounded bg-purple-100 text-purple-600 text-xs font-bold flex-shrink-0">IT</span>
+              {% elif layer.type_value == 'background' %}
+              <span class="w-5 h-5 flex items-center justify-center rounded bg-gray-200 text-gray-600 text-xs font-bold flex-shrink-0">BG</span>
               {% endif %}
             {% else %}
               <!-- Type icon: custom shape layers -->
@@ -162,7 +140,6 @@
         <button
           class="px-2 py-1 text-xs rounded border border-red-300 text-red-500 hover:bg-red-50 hover:text-red-700 transition flex items-center gap-1"
           hx-post="/api/slots/{{ pattern_id }}/reset"
-          hx-confirm="全ての変更とAI生成結果をリセットします。本当によろしいですか？ (This will wipe all changes and generated content. Are you sure?)"
         >
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -172,8 +149,42 @@
         </button>
       </div>
     </div>
-    <div class="flex-1 overflow-auto flex items-center justify-center p-4 bg-gray-100">
+    <div class="relative flex-1 overflow-auto flex items-center justify-center p-4 bg-gray-100">
       {% include "partials/preview_canvas.html" %}
+      
+      <!-- AI Art Director Feedback Output -->
+      <div id="auto-fix-feedback-container" class="absolute top-4 right-4 flex flex-col items-end z-10 w-96 pointer-events-none">
+        <div id="auto-fix-feedback" class="pointer-events-auto"></div>
+      </div>
+
+      <!-- AI Art Director Manual Trigger -->
+      <div class="absolute bottom-6 right-6 z-10 flex flex-col items-end gap-2">
+        <div id="auto-fix-input-row" class="flex items-center gap-2 bg-white/95 backdrop-blur rounded-full shadow-lg border border-gray-200 pl-4 pr-1 py-1 w-96 transition-all">
+          <input
+            id="auto-fix-comment"
+            type="text"
+            name="user_comment"
+            placeholder="修正指示を入力（例：テキストをもっと大きく）"
+            class="flex-1 text-sm bg-transparent outline-none placeholder-gray-400 text-gray-700"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('auto-fix-trigger').click()}"
+          >
+          <button
+            id="auto-fix-trigger"
+            class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-full transition-all flex items-center gap-1.5 hover:scale-105 group flex-shrink-0"
+            hx-post="/api/ai-generation/auto-fix/{{ pattern_id }}"
+            hx-indicator="#auto-fix-spinner"
+            hx-swap="none"
+            hx-include="#auto-fix-comment"
+          >
+            <svg class="w-4 h-4 group-hover:animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+            <span id="auto-fix-btn-content">AI修正</span>
+            <svg id="auto-fix-spinner" class="htmx-indicator w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8h8z"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -181,22 +192,33 @@
   <aside class="w-80 flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
 
     <!-- Tab headers -->
-    <div class="flex border-b border-gray-200 px-4 pt-3 flex-shrink-0">
+    <div class="flex border-b border-gray-200 px-2 pt-3 flex-shrink-0">
       <button
         id="tab-manual-btn"
         onclick="switchEditorTab('manual')"
-        class="px-3 py-2 text-xs font-semibold border-b-2 border-indigo-600 text-indigo-600 -mb-px transition-colors"
+        class="px-2.5 py-2 text-xs font-semibold border-b-2 border-indigo-600 text-indigo-600 -mb-px transition-colors"
       >スロット編集</button>
       <button
         id="tab-ai-btn"
         onclick="switchEditorTab('ai')"
-        class="px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px transition-colors flex items-center gap-1"
+        class="px-2.5 py-2 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px transition-colors flex items-center gap-1"
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
         </svg>
         AI生成
+      </button>
+      <button
+        id="tab-raster-btn"
+        onclick="switchEditorTab('raster')"
+        class="px-2.5 py-2 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px transition-colors flex items-center gap-1"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        ラスター作成
       </button>
     </div>
 
@@ -211,115 +233,36 @@
     <!-- AI generation tab panel -->
     <div id="panel-ai" class="hidden flex-1 overflow-y-auto p-4">
       <p class="text-[11px] text-gray-400 mb-3">各スロットにプロンプトを入力して個別生成、またはまとめてAIで仕上げます。</p>
-
-      {% for slot in slots %}
-      <div id="ai-slot-container-{{ slot.id }}" data-locked="false" data-slot-type="{{ slot.type.value }}" class="border border-gray-200 rounded-lg p-3 mb-2">
-        <div class="flex items-center gap-2 mb-1.5">
-          {% if slot.type.value == 'text' %}
-          <span class="w-5 h-5 flex items-center justify-center rounded bg-blue-100 text-blue-600 text-[10px] font-bold flex-shrink-0">T</span>
-          {% elif slot.type.value == 'image' %}
-          <span class="w-5 h-5 flex items-center justify-center rounded bg-green-100 text-green-600 text-[10px] font-bold flex-shrink-0">I</span>
-          {% elif slot.type.value == 'button' %}
-          <span class="w-5 h-5 flex items-center justify-center rounded bg-orange-100 text-orange-600 text-[10px] font-bold flex-shrink-0">B</span>
-          {% elif slot.type.value == 'image_or_text' %}
-          <span class="w-5 h-5 flex items-center justify-center rounded bg-purple-100 text-purple-600 text-[10px] font-bold flex-shrink-0">IT</span>
-          {% endif %}
-          <span class="text-xs font-semibold text-gray-700 flex-1 truncate">{{ slot.id }}</span>
-          {% if slot.required %}
-          <span class="text-[10px] font-semibold uppercase bg-red-100 text-red-600 px-1.5 py-0.5 rounded flex-shrink-0">必須</span>
-          {% else %}
-          <span class="text-[10px] font-semibold uppercase bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded flex-shrink-0">任意</span>
-          {% endif %}
-        </div>
-
-        {% if slot.description %}
-        <p class="text-[11px] text-gray-400 mb-1.5">{{ slot.description }}</p>
-        {% endif %}
-
-        <!-- Input row (prompt mode) -->
-        <div id="ai-slot-input-row-{{ slot.id }}">
-          <div class="flex gap-1.5">
-            <textarea
-              id="ai-prompt-{{ slot.id }}"
-              rows="2"
-              placeholder="{{ slot.prompt_placeholder or 'プロンプトを入力...' }}"
-              class="flex-1 text-xs border border-gray-300 rounded-md px-2 py-1.5 resize-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
-            ></textarea>
-            <button
-              type="button"
-              onclick="generateSlot('{{ pattern_id }}', '{{ slot.id }}', '{{ slot.type.value }}')"
-              class="self-start px-2 py-1.5 text-[11px] bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-md font-semibold whitespace-nowrap transition-colors"
-            >生成</button>
-          </div>
-          {% if slot.type.value in ('image', 'image_or_text') %}
-          <!-- Fix 2: 透明化 toggle in AI tab (mirrors Manual tab) -->
-          <label class="flex items-center gap-2 mt-1.5 cursor-pointer select-none">
-            <div class="relative">
-              <input type="checkbox" id="ai-rembg-toggle-{{ slot.id }}" class="sr-only peer">
-              <div class="w-8 h-4 bg-gray-200 rounded-full peer-checked:bg-green-500 transition-colors"></div>
-              <div class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
-            </div>
-            <span class="text-[10px] text-gray-500">透明化 (背景除去)</span>
-          </label>
-          {% endif %}
-        </div>
-
-        <!-- Generated state (shown after successful individual generation) -->
-        <div id="ai-slot-generated-{{ slot.id }}" class="hidden mt-1.5">
-          <div class="bg-gray-50 border border-gray-200 rounded-md p-2 flex items-start gap-2">
-            <span id="ai-slot-generated-display-{{ slot.id }}" class="flex-1 text-xs text-gray-600 break-words leading-relaxed"></span>
-            <button
-              type="button"
-              onclick="resetSlotToPromptMode('{{ slot.id }}')"
-              class="text-[11px] text-indigo-500 hover:text-indigo-700 font-medium whitespace-nowrap shrink-0 mt-0.5"
-            >編集</button>
-          </div>
-        </div>
-
-        <div id="ai-slot-result-{{ slot.id }}" class="mt-1.5 hidden"></div>
+      <div id="ai-tab-slots">
+        {% include "partials/ai_tab.html" %}
       </div>
-      {% endfor %}
+    </div>
 
-      <!-- Custom image layers in AI tab -->
-      {% for layer in custom_layers if layer.type == 'image' %}
-      <div id="ai-slot-container-{{ layer.id }}" data-locked="false" data-slot-type="image" class="border border-gray-200 rounded-lg p-3 mb-2">
-        <div class="flex items-center gap-2 mb-1.5">
-          <span class="w-5 h-5 flex items-center justify-center rounded bg-gray-100 text-gray-600 text-[10px] font-bold flex-shrink-0">I</span>
-          <span class="text-xs font-semibold text-gray-700 flex-1 truncate">{{ layer.get('label', layer.id) }}</span>
-          <span class="text-[10px] font-semibold uppercase bg-indigo-100 text-indigo-500 px-1.5 py-0.5 rounded flex-shrink-0">カスタム</span>
-        </div>
-        <div id="ai-slot-input-row-{{ layer.id }}">
-          <div class="flex gap-1.5">
-            <textarea
-              id="ai-prompt-{{ layer.id }}"
-              rows="2"
-              placeholder="プロンプトを入力..."
-              class="flex-1 text-xs border border-gray-300 rounded-md px-2 py-1.5 resize-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
-            ></textarea>
-            <button
-              type="button"
-              onclick="generateSlot('{{ pattern_id }}', '{{ layer.id }}', 'image')"
-              class="self-start px-2 py-1.5 text-[11px] bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-md font-semibold whitespace-nowrap transition-colors"
-            >生成</button>
-          </div>
-          <label class="flex items-center gap-2 mt-1.5 cursor-pointer select-none">
-            <div class="relative">
-              <input type="checkbox" id="ai-rembg-toggle-{{ layer.id }}" class="sr-only peer">
-              <div class="w-8 h-4 bg-gray-200 rounded-full peer-checked:bg-green-500 transition-colors"></div>
-              <div class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
-            </div>
-            <span class="text-[10px] text-gray-500">透明化 (背景除去)</span>
-          </label>
-        </div>
-        <div id="ai-slot-generated-{{ layer.id }}" class="hidden mt-1.5">
-          <div class="bg-gray-50 border border-gray-200 rounded-md p-2 flex items-start gap-2">
-            <span id="ai-slot-generated-display-{{ layer.id }}" class="flex-1 text-xs text-gray-600 break-words leading-relaxed"></span>
-            <button type="button" onclick="resetSlotToPromptMode('{{ layer.id }}')" class="text-[11px] text-indigo-500 hover:text-indigo-700 font-medium whitespace-nowrap shrink-0 mt-0.5">編集</button>
-          </div>
-        </div>
-        <div id="ai-slot-result-{{ layer.id }}" class="mt-1.5 hidden"></div>
+    <!-- AI Raster Inspiration tab panel -->
+    <div id="panel-raster" class="hidden flex-1 overflow-y-auto p-4 space-y-3">
+      <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+        <p class="text-[11px] font-semibold text-amber-700 mb-0.5">ステップ 1 — フラット画像を生成</p>
+        <p class="text-[10px] text-amber-600">クリエイティブなイメージをプロンプトで生成します。これは参考用のフラット画像です（編集不可）。</p>
       </div>
-      {% endfor %}
+      <textarea
+        id="raster-inspire-prompt"
+        rows="3"
+        placeholder="例: 深夜の東京、ネオンと雨、ダークサイバーパンクの雰囲気..."
+        class="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-rose-400 focus:border-rose-400 resize-none"
+      ></textarea>
+      <button
+        type="button"
+        onclick="startRasterInspire('{{ pattern_id }}')"
+        class="w-full py-2 px-4 bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-1.5"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        フラット画像を生成
+      </button>
+
+      <!-- Result area: shows generated image + layerize button -->
+      <div id="raster-inspire-result" class="space-y-3"></div>
     </div>
 
     <!-- Sticky bottom: action buttons -->
@@ -362,6 +305,11 @@
             </button>
           </div>
         </details>
+      </div>
+
+      <!-- Raster tab actions (empty sticky — controls live in the panel) -->
+      <div id="bottom-raster" class="hidden">
+        <p class="text-[10px] text-gray-400 text-center">フラット画像を生成してから「レイヤー化を試みる」ボタンを押してください。</p>
       </div>
 
       <!-- AI tab actions -->
@@ -471,24 +419,31 @@
   // Tab switching
   // ---------------------------------------------------------------------------
   function switchEditorTab(tab) {
-    var isAi = tab === 'ai';
+    var panels  = { manual: 'panel-manual', ai: 'panel-ai', raster: 'panel-raster' };
+    var bottoms = { manual: 'bottom-manual', ai: 'bottom-ai', raster: 'bottom-raster' };
+    var activeBase = 'px-2.5 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors';
+    var inactiveBase = activeBase + ' border-transparent text-gray-500 hover:text-gray-700';
+    var btnStyles = {
+      manual: activeBase + ' border-indigo-600 text-indigo-600',
+      ai:     activeBase + ' border-purple-600 text-purple-600 flex items-center gap-1',
+      raster: activeBase + ' border-rose-500 text-rose-500 flex items-center gap-1',
+    };
+    var inactiveStyles = {
+      manual: inactiveBase,
+      ai:     inactiveBase + ' flex items-center gap-1',
+      raster: inactiveBase + ' flex items-center gap-1',
+    };
 
-    document.getElementById('panel-manual').classList.toggle('hidden', isAi);
-    document.getElementById('panel-ai').classList.toggle('hidden', !isAi);
-    document.getElementById('bottom-manual').classList.toggle('hidden', isAi);
-    document.getElementById('bottom-ai').classList.toggle('hidden', !isAi);
+    ['manual', 'ai', 'raster'].forEach(function(t) {
+      var panel = document.getElementById(panels[t]);
+      var bottom = document.getElementById(bottoms[t]);
+      var btn = document.getElementById('tab-' + t + '-btn');
+      if (panel)  panel.classList.toggle('hidden', t !== tab);
+      if (bottom) bottom.classList.toggle('hidden', t !== tab);
+      if (btn)    btn.className = (t === tab) ? btnStyles[t] : inactiveStyles[t];
+    });
 
-    var manualBtn = document.getElementById('tab-manual-btn');
-    var aiBtn = document.getElementById('tab-ai-btn');
-
-    if (isAi) {
-      manualBtn.className = 'px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px transition-colors';
-      aiBtn.className = 'px-3 py-2 text-xs font-semibold border-b-2 border-purple-600 text-purple-600 -mb-px transition-colors flex items-center gap-1';
-      if (typeof syncAllTextToAiTab !== 'undefined') syncAllTextToAiTab();
-    } else {
-      manualBtn.className = 'px-3 py-2 text-xs font-semibold border-b-2 border-indigo-600 text-indigo-600 -mb-px transition-colors';
-      aiBtn.className = 'px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px transition-colors flex items-center gap-1';
-    }
+    if (tab === 'ai' && typeof syncAllTextToAiTab !== 'undefined') syncAllTextToAiTab();
   }
 
   // ---------------------------------------------------------------------------
@@ -800,14 +755,18 @@
   // ---------------------------------------------------------------------------
   // Phase 1: SortableJS drag-to-reorder layers
   // ---------------------------------------------------------------------------
-  document.addEventListener('DOMContentLoaded', function() {
+  var _sortableInstance = null;
+
+  function initSortable() {
     var sortList = document.getElementById('layer-sort-list');
-    if (sortList && typeof Sortable !== 'undefined') {
-      Sortable.create(sortList, {
-        animation: 150,
-        onEnd: function() {
-          var items = sortList.querySelectorAll('li[data-slot-id]');
-          var order = Array.from(items).map(function(li) { return li.dataset.slotId; });
+    if (!sortList || typeof Sortable === 'undefined') return;
+    // Destroy previous instance so OOB swaps don't double-bind
+    if (_sortableInstance) { try { _sortableInstance.destroy(); } catch (e) {} }
+    _sortableInstance = Sortable.create(sortList, {
+      animation: 150,
+      onEnd: function() {
+        var items = sortList.querySelectorAll('li[data-slot-id]');
+        var order = Array.from(items).map(function(li) { return li.dataset.slotId; });
 
           // Fix 1: Reorder right-side panels to match new left-sidebar order
           var slotEditorContainer = document.querySelector('#slot-editor-panel .space-y-4');
@@ -845,7 +804,12 @@
           });
         }
       });
-    }
+  }
+
+  document.addEventListener('DOMContentLoaded', initSortable);
+  // Re-bind after every HTMX OOB swap (e.g. sidebar refresh from blend_progress)
+  document.addEventListener('htmx:afterSettle', function(evt) {
+    if (document.getElementById('layer-sort-list')) initSortable();
   });
 
   // ---------------------------------------------------------------------------
@@ -866,12 +830,116 @@
 
       // Use global prompt as fallback if no per-slot prompt
       if (promptEl && !promptEl.value.trim() && globalPrompt) {
-        promptEl.value = globalPrompt;
+        // Appending the slot ID and its description injects specific context (e.g. "badge (セールバッジ) for a ramen ad")
+        var descEl = container.querySelector('p.text-gray-400');
+        var descText = descEl ? " (" + descEl.textContent.trim() + ")" : "";
+        promptEl.value = slotId + descText + " for " + globalPrompt;
       }
 
       if (promptEl && promptEl.value.trim()) {
         await generateSlot(patternId, slotId, slotType);
       }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // AI ラスター作成 tab — Step 1: generate flat reference image
+  // ---------------------------------------------------------------------------
+  async function startRasterInspire(patternId) {
+    var promptEl = document.getElementById('raster-inspire-prompt');
+    var prompt = promptEl ? promptEl.value.trim() : '';
+    if (!prompt) { promptEl && promptEl.focus(); return; }
+
+    var resultDiv = document.getElementById('raster-inspire-result');
+    resultDiv.innerHTML =
+      '<p class="text-[11px] text-rose-500 animate-pulse">フラット画像を生成中...</p>';
+
+    try {
+      var fd = new FormData();
+      fd.append('prompt', prompt);
+      var resp = await fetch('/api/ai-generation/raster-inspire/' + patternId, {
+        method: 'POST', body: fd
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      _pollRasterInspire(patternId, data.job_id, data.poll_url, resultDiv);
+    } catch (e) {
+      resultDiv.innerHTML =
+        '<p class="text-[11px] text-red-500">エラー: ' + e.message + '</p>';
+    }
+  }
+
+  function _pollRasterInspire(patternId, jobId, pollUrl, resultDiv) {
+    var evtSource = new EventSource(pollUrl);
+    evtSource.onmessage = function(e) {
+      var data = JSON.parse(e.data);
+      if (data.status === 'completed' && data.image_url) {
+        evtSource.close();
+        resultDiv.innerHTML =
+          '<div class="space-y-2">' +
+          '<img src="' + data.image_url + '" alt="参考ラスター" class="w-full rounded-lg border border-rose-200 shadow-sm">' +
+          '<p class="text-[10px] text-gray-400 leading-tight">これは編集不可のフラット画像です。AIへのビジョン参考として使用されます。</p>' +
+          '<div class="border-t border-gray-100 pt-2">' +
+          '<p class="text-[11px] font-semibold text-gray-600 mb-1">ステップ 2 — レイヤー化</p>' +
+          '<textarea id="layerize-prompt" rows="2" placeholder="追加の方向性（省略可）..." ' +
+          'class="w-full text-xs border border-gray-300 rounded px-2 py-1.5 mb-2 resize-none focus:ring-1 focus:ring-rose-400"></textarea>' +
+          '<button type="button" ' +
+          'onclick="startLayerize(\'' + patternId + '\', \'' + data.image_url + '\')" ' +
+          'class="w-full py-2 px-4 bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white text-xs font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-1.5">' +
+          '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+          'd="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>' +
+          '</svg>' +
+          'レイヤー化を試みる</button>' +
+          '</div></div>';
+      } else if (data.status === 'failed') {
+        evtSource.close();
+        resultDiv.innerHTML =
+          '<p class="text-[11px] text-red-500">生成失敗: ' + (data.error || '') + '</p>';
+      } else {
+        resultDiv.innerHTML =
+          '<p class="text-[11px] text-rose-500 animate-pulse">生成中 ' + (data.progress || 0) + '%...</p>';
+      }
+    };
+    evtSource.onerror = function() {
+      evtSource.close();
+      resultDiv.innerHTML =
+        '<p class="text-[11px] text-red-500">接続エラー</p>';
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // AI ラスター作成 tab — Step 2: layerize (multimodal macro_autofill)
+  // ---------------------------------------------------------------------------
+  async function startLayerize(patternId, referenceImageUrl) {
+    var extraPromptEl = document.getElementById('layerize-prompt');
+    var extraPrompt = extraPromptEl ? extraPromptEl.value.trim() : '';
+
+    var resultDiv = document.getElementById('raster-inspire-result');
+    resultDiv.innerHTML =
+      '<div class="space-y-2">' +
+      '<p class="text-xs font-medium text-purple-600 animate-pulse">ビジョンAIでレイヤー解析中...</p>' +
+      '<div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-purple-600 h-2 rounded-full" style="width:5%"></div></div>' +
+      '</div>';
+
+    try {
+      var fd = new FormData();
+      fd.append('reference_image_url', referenceImageUrl);
+      if (extraPrompt) fd.append('global_prompt', extraPrompt);
+      var resp = await fetch('/api/ai-generation/layerize/' + patternId, {
+        method: 'POST', body: fd
+      });
+      var html = await resp.text();
+      // Surface the progress UI in the main generate-result area (same as normal AI)
+      document.getElementById('generate-result').innerHTML = html;
+      htmx.process(document.getElementById('generate-result'));
+      // Clear raster panel
+      resultDiv.innerHTML =
+        '<p class="text-[11px] text-purple-600">レイヤー化パイプラインを開始しました。右下の進捗をご確認ください。</p>';
+    } catch (e) {
+      resultDiv.innerHTML =
+        '<p class="text-[11px] text-red-500">エラー: ' + e.message + '</p>';
     }
   }
 </script>

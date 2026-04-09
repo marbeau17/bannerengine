@@ -1,0 +1,54 @@
+{% set cv = current_value if current_value is mapping else {} %}
+{% set slot_patch_url = '/api/slots/' + pattern_id + '/' + current_slot.id %}
+<div class="space-y-2">
+  <p class="text-[11px] text-gray-400">背景層を設定します。画像URLまたはカラーを選択してください。</p>
+
+  <!-- Fill color -->
+  <div class="flex items-center gap-2">
+    <label class="text-[11px] text-gray-500 w-16 shrink-0">背景色</label>
+    <input
+      type="color"
+      name="fill_color"
+      value="{{ cv.get('fill_color', '#ffffff') }}"
+      class="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
+      hx-patch="{{ slot_patch_url }}"
+      hx-target="#preview-canvas"
+      hx-swap="outerHTML"
+      hx-trigger="input changed delay:300ms"
+      hx-sync="body:queue"
+      hx-vals='{"slot_type": "background"}'
+    >
+    <span class="text-[10px] text-gray-400">{{ cv.get('fill_color', '') }}</span>
+  </div>
+
+  <!-- Image URL -->
+  <div class="space-y-1">
+    <label class="text-[11px] text-gray-500">背景画像URL</label>
+    <input
+      type="text"
+      name="source_url"
+      value="{{ cv.get('source_url', '') }}"
+      placeholder="/static/... または https://..."
+      class="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+      hx-patch="{{ slot_patch_url }}"
+      hx-target="#preview-canvas"
+      hx-swap="outerHTML"
+      hx-trigger="input changed delay:600ms"
+      hx-sync="body:queue"
+      hx-vals='{"slot_type": "background"}'
+    >
+    <p class="text-[10px] text-gray-400">画像URLを設定すると背景色より優先されます。</p>
+  </div>
+
+  <!-- Clear button -->
+  {% if cv.get('source_url') or cv.get('fill_color') %}
+  <button
+    type="button"
+    class="text-[11px] text-red-400 hover:text-red-600"
+    hx-patch="{{ slot_patch_url }}"
+    hx-target="#preview-canvas"
+    hx-swap="outerHTML"
+    hx-vals='{"slot_type": "background", "source_url": "", "fill_color": ""}'
+  >クリア</button>
+  {% endif %}
+</div>

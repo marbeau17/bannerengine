@@ -16,6 +16,8 @@
         <span class="w-5 h-5 flex items-center justify-center rounded bg-orange-100 text-orange-600 text-xs font-bold flex-shrink-0">B</span>
         {% elif layer.type_value == 'image_or_text' %}
         <span class="w-5 h-5 flex items-center justify-center rounded bg-purple-100 text-purple-600 text-xs font-bold flex-shrink-0">IT</span>
+        {% elif layer.type_value == 'background' %}
+        <span class="w-5 h-5 flex items-center justify-center rounded bg-gray-200 text-gray-600 text-xs font-bold flex-shrink-0">BG</span>
         {% endif %}
       {% else %}
         <!-- Type icon: custom shape layers -->

@@ -105,6 +105,17 @@ class XMLTemplateParser:
         slots = self._parse_slots(slots_elem) if slots_elem is not None else []
         rules = self._parse_rules(rules_elem) if rules_elem is not None else []
 
+        # Append the native __background__ slot at the END so it sits at the
+        # back of the visual stack (_order is front-to-back: last = background).
+        if not any(s.id == "__background__" for s in slots):
+            slots.append(Slot(
+                id="__background__",
+                type=SlotType.BACKGROUND,
+                x=0.0, y=0.0, width=100.0, height=100.0,
+                description="背景層 (Background)",
+                required=False,
+            ))
+
         return BannerTemplate(meta=meta, design=design, slots=slots, rules=rules)
 
     def _parse_meta(self, meta_elem: Element) -> TemplateMeta:

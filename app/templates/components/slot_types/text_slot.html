@@ -103,6 +103,186 @@
         >
         <span class="text-[10px] text-gray-400">{{ cv.get('color', current_slot.color or '#000000') }}</span>
       </div>
+
+      <!-- Font Family -->
+      <div class="flex items-center gap-2">
+        <label class="text-[11px] text-gray-500 w-16 shrink-0">フォント</label>
+        <select
+          name="font_family"
+          class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+          hx-patch="{{ slot_patch_url }}"
+          hx-target="#preview-canvas"
+          hx-swap="outerHTML"
+          hx-trigger="change"
+          hx-sync="body:queue"
+          hx-vals='{"slot_type": "text"}'
+        >
+          <option value="" {{ 'selected' if not cv.get('font_family') }}>デフォルト</option>
+          <option value="Noto Sans JP" {{ 'selected' if cv.get('font_family') == 'Noto Sans JP' }}>Noto Sans JP（モダン）</option>
+          <option value="M PLUS Rounded 1c" {{ 'selected' if cv.get('font_family') == 'M PLUS Rounded 1c' }}>M PLUS Rounded（ポップ）</option>
+          <option value="Shippori Mincho" {{ 'selected' if cv.get('font_family') == 'Shippori Mincho' }}>Shippori Mincho（高級）</option>
+          <option value="Dela Gothic One" {{ 'selected' if cv.get('font_family') == 'Dela Gothic One' }}>Dela Gothic One（インパクト）</option>
+        </select>
+      </div>
+
+      <!-- Vertical text toggle -->
+      <div class="flex items-center gap-2">
+        <label class="text-[11px] text-gray-500 w-16 shrink-0">縦書き</label>
+        <input
+          type="checkbox"
+          id="vertical-toggle-{{ current_slot.id }}"
+          {% if cv.get('vertical') %}checked{% endif %}
+          class="accent-indigo-600"
+          onchange="htmx.ajax('PATCH','{{ slot_patch_url }}',{values:{slot_type:'text',vertical:this.checked?'true':'false'},target:'#preview-canvas',swap:'outerHTML'})"
+        >
+      </div>
+
+      <!-- Rotation -->
+      <div class="flex items-center gap-2">
+        <label class="text-[11px] text-gray-500 w-16 shrink-0">回転</label>
+        <input
+          type="range" min="-180" max="180" step="1"
+          name="rotation"
+          value="{{ cv.get('rotation', 0) | int }}"
+          class="flex-1 h-1.5 accent-indigo-600"
+          hx-patch="{{ slot_patch_url }}"
+          hx-target="#preview-canvas"
+          hx-swap="outerHTML"
+          hx-trigger="input changed delay:200ms"
+          hx-sync="body:queue"
+          hx-vals='{"slot_type": "text"}'
+          oninput="this.nextElementSibling.textContent = this.value + '°'"
+        >
+        <span class="text-[11px] text-gray-400 w-9 text-right">{{ cv.get('rotation', 0) | int }}°</span>
+      </div>
+
+      <!-- SVG Text Effect -->
+      {% set ts = cv.get('text_style', {}) %}
+      {% set et = ts.get('effect_type', '') %}
+      {% set sid = current_slot.id %}
+      <div class="border-t border-gray-100 pt-2 mt-1 space-y-2">
+        <p class="text-[11px] font-medium text-gray-500">エフェクト</p>
+
+        <!-- Effect type selector -->
+        <div class="flex items-center gap-2">
+          <label class="text-[11px] text-gray-500 w-16 shrink-0">種類</label>
+          <select
+            id="effect-type-{{ sid }}"
+            name="effect_type"
+            class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+            hx-patch="{{ slot_patch_url }}"
+            hx-target="#preview-canvas"
+            hx-swap="outerHTML"
+            hx-trigger="change"
+            hx-sync="body:queue"
+            hx-vals='{"slot_type": "text"}'
+            onchange="updateTextEffectControls('{{ sid }}')"
+          >
+            <option value="" {{ 'selected' if not et }}>なし</option>
+            <option value="neon_glow" {{ 'selected' if et == 'neon_glow' }}>ネオングロー</option>
+            <option value="drop_shadow" {{ 'selected' if et == 'drop_shadow' }}>ドロップシャドウ</option>
+            <option value="outline_stroke" {{ 'selected' if et == 'outline_stroke' }}>アウトライン</option>
+            <option value="outline_and_shadow" {{ 'selected' if et == 'outline_and_shadow' }}>アウトライン＋シャドウ</option>
+            <option value="metallic" {{ 'selected' if et == 'metallic' }}>メタリック</option>
+          </select>
+        </div>
+
+        <!-- Effect color (all effects) -->
+        <div id="effect-color-row-{{ sid }}" class="flex items-center gap-2" style="{{ '' if et else 'display:none' }}">
+          <label id="effect-color-label-{{ sid }}" class="text-[11px] text-gray-500 w-16 shrink-0">{{ 'ストローク色' if et in ('outline_stroke', 'outline_and_shadow') else '色' }}</label>
+          <input
+            type="color"
+            name="effect_color"
+            value="{{ ts.get('effect_color', '#000000') }}"
+            class="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
+            hx-patch="{{ slot_patch_url }}"
+            hx-target="#preview-canvas"
+            hx-swap="outerHTML"
+            hx-trigger="input changed delay:300ms"
+            hx-sync="body:queue"
+            hx-vals='{"slot_type": "text"}'
+          >
+          <span class="text-[10px] text-gray-400">{{ ts.get('effect_color', '#000000') }}</span>
+        </div>
+
+        <!-- Shadow color (outline_and_shadow only) -->
+        <div id="effect-shadow-color-row-{{ sid }}" class="flex items-center gap-2" style="{{ '' if et == 'outline_and_shadow' else 'display:none' }}">
+          <label class="text-[11px] text-gray-500 w-16 shrink-0">シャドウ色</label>
+          <input
+            type="color"
+            name="shadow_color"
+            value="{{ ts.get('shadow_color', '#000000') }}"
+            class="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
+            hx-patch="{{ slot_patch_url }}"
+            hx-target="#preview-canvas"
+            hx-swap="outerHTML"
+            hx-trigger="input changed delay:300ms"
+            hx-sync="body:queue"
+            hx-vals='{"slot_type": "text"}'
+          >
+          <span class="text-[10px] text-gray-400">{{ ts.get('shadow_color', '#000000') }}</span>
+        </div>
+
+        <!-- ── Neon Glow / Metallic: blur radius ─────────────────────────── -->
+        <div id="effect-blur-adv-{{ sid }}" class="space-y-2 pl-1 border-l-2 border-gray-100" style="{{ '' if et in ('neon_glow', 'metallic') else 'display:none' }}">
+          <div class="flex items-center gap-2">
+            <label class="text-[11px] text-gray-500 w-16 shrink-0">グロー半径</label>
+            <input
+              type="range" min="1" max="30" step="0.5"
+              name="shadow_blur"
+              value="{{ ts.get('shadow_blur', 8) }}"
+              class="flex-1 h-1.5 accent-purple-500"
+              hx-patch="{{ slot_patch_url }}"
+              hx-target="#preview-canvas"
+              hx-swap="outerHTML"
+              hx-trigger="input changed delay:200ms"
+              hx-sync="body:queue"
+              hx-vals='{"slot_type": "text"}'
+              oninput="this.nextElementSibling.textContent = this.value + 'px'"
+            >
+            <span class="text-[11px] text-gray-400 w-9 text-right">{{ ts.get('shadow_blur', 8) }}px</span>
+          </div>
+        </div>
+
+        <!-- ── Outline Stroke: stroke width ──────────────────────────────── -->
+        <div id="effect-stroke-adv-{{ sid }}" class="space-y-2 pl-1 border-l-2 border-gray-100" style="{{ '' if et in ('outline_stroke', 'outline_and_shadow') else 'display:none' }}">
+          <div class="flex items-center gap-2">
+            <label class="text-[11px] text-gray-500 w-16 shrink-0">太さ</label>
+            <input
+              type="range" min="1" max="10" step="0.5"
+              name="stroke_width"
+              value="{{ ts.get('stroke_width', 2) }}"
+              class="flex-1 h-1.5 accent-indigo-600"
+              hx-patch="{{ slot_patch_url }}"
+              hx-target="#preview-canvas"
+              hx-swap="outerHTML"
+              hx-trigger="input changed delay:200ms"
+              hx-sync="body:queue"
+              hx-vals='{"slot_type": "text"}'
+              oninput="this.nextElementSibling.textContent = this.value + 'px'"
+            >
+            <span class="text-[11px] text-gray-400 w-9 text-right">{{ ts.get('stroke_width', 2) }}px</span>
+          </div>
+        </div>
+      </div>
     </div>
   </details>
 </div>
+
+<script>
+function updateTextEffectControls(slotId) {
+  var sel = document.getElementById('effect-type-' + slotId);
+  if (!sel) return;
+  var val = sel.value;
+  var colorRow        = document.getElementById('effect-color-row-'         + slotId);
+  var colorLabel      = document.getElementById('effect-color-label-'       + slotId);
+  var shadowColorRow  = document.getElementById('effect-shadow-color-row-'  + slotId);
+  var blurAdv         = document.getElementById('effect-blur-adv-'          + slotId);
+  var strokeAdv       = document.getElementById('effect-stroke-adv-'        + slotId);
+  if (colorRow)       colorRow.style.display       = val ? '' : 'none';
+  if (colorLabel)     colorLabel.textContent        = (val === 'outline_stroke' || val === 'outline_and_shadow') ? 'ストローク色' : '色';
+  if (shadowColorRow) shadowColorRow.style.display  = (val === 'outline_and_shadow') ? '' : 'none';
+  if (blurAdv)        blurAdv.style.display         = (val === 'neon_glow' || val === 'metallic') ? '' : 'none';
+  if (strokeAdv)      strokeAdv.style.display       = (val === 'outline_stroke' || val === 'outline_and_shadow') ? '' : 'none';
+}
+</script>

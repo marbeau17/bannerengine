@@ -43,8 +43,14 @@ def _build_sidebar_layers(template, slot_values: dict) -> tuple[list, list]:
         if lid and lid not in all_ids_ordered:
             all_ids_ordered.append(lid)
 
-    # Reverse for Photoshop display (last in draw order = top of sidebar)
-    display_ids = list(reversed(all_ids_ordered))
+    # Force background to always be at the bottom of the stack
+    if "__background__" in all_ids_ordered:
+        all_ids_ordered.remove("__background__")
+        all_ids_ordered.append("__background__")
+
+    # _order is front-to-back (index 0 = front/top layer, last = __background__)
+    # Display directly — no reversal needed.
+    display_ids = list(all_ids_ordered)
 
     sidebar_layers: list[dict] = []
     for sid in display_ids:
@@ -58,7 +64,7 @@ def _build_sidebar_layers(template, slot_values: dict) -> tuple[list, list]:
                 "kind": "slot",
                 "type_value": slot.type.value,
                 "required": getattr(slot, "required", False),
-                "label": slot.id,
+                "label": "背景" if slot.id == "__background__" else slot.id,
             })
         elif sid in custom_map:
             layer = custom_map[sid]
@@ -138,16 +144,7 @@ def _flatten_slot_values(slot_values: dict) -> dict:
             continue
         lid = layer.get("id")
         if lid and lid not in flat:
-            # Expose as a value dict matching what slot editor templates expect
-            layer_type = layer.get("type", "rect")
-            opacity = layer.get("opacity", 1.0)
-            if layer_type == "text":
-                flat[lid] = {"text": layer.get("text", ""), "color": layer.get("color", "#111111"),
-                             "font_size": layer.get("font_size", "24"), "opacity": opacity}
-            elif layer_type == "image":
-                flat[lid] = {"source_url": layer.get("source_url", ""), "opacity": opacity}
-            elif layer_type in ("rect", "circle"):
-                flat[lid] = {"fill": layer.get("fill", "#4f46e5"), "opacity": opacity}
+            flat[lid] = dict(layer)  # Copy ALL properties so opacity/blend_mode/rotation persist
     return flat
 
 

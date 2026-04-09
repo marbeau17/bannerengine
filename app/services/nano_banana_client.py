@@ -134,7 +134,7 @@ class NanoBananaClient:
             parts.append(f"User creative direction: {user_prompt}")
 
         parts.extend([
-            f"Generate a banner image with dimensions {canvas.get('width', 1200)}x{canvas.get('height', 630)} pixels.",
+            f"Generate a seamless, edge-to-edge image that perfectly fills the entire canvas. Absolutely NO borders, NO margins, and NO letterboxing padding.",
             f"Background color: {canvas.get('background_color', '#FFFFFF')}.",
             f"Output format: {canvas.get('format', 'png')}.",
         ])
@@ -351,20 +351,24 @@ Important:
         layers = instruction.get("layers", [])
 
         if mode == "ai":
-            # Creative mode: polish aesthetics freely but RESPECT physical layout structure.
-            # Phase 4: We must constrain hallucinations — the AI may reimagine visuals
-            # and typography style, but must NOT move, resize, or remove elements.
+            # Creative mode: the reference image is a STRUCTURAL SKELETON ONLY.
+            # The user's theme directive is the supreme authority — all template
+            # decorations, colors, and thematic graphics must be replaced to match it.
             parts = [
-                "You are a creative banner designer. I'm providing a reference layout image.",
+                "You are an expert creative banner designer. I'm providing a reference layout image.",
                 f"Canvas: {canvas.get('width', 1200)}x{canvas.get('height', 630)} pixels.",
-                f"Background: {canvas.get('background_color', '#FFFFFF')}.",
                 "CRITICAL LAYOUT RULES — you MUST obey these unconditionally:",
-                "1. Preserve the exact X/Y position and bounding box of EVERY element from the reference.",
-                "2. Do not move, resize, add, or remove any element.",
-                "3. The spatial composition is FIXED — treat it as an immovable constraint.",
-                "Within those constraints you are free to: improve colours, lighting, shadows, gradients, "
-                "textures, image realism, and overall visual polish. Rewrite text only when a user "
-                "creative direction explicitly asks for new copy.",
+                "1. Preserve the precise X/Y spatial position and bounding box of EVERY key element from the reference layout.",
+                "2. The structural composition is FIXED — treat the layout grid as an immovable constraint.",
+                "",
+                "CRITICAL AESTHETIC RULES:",
+                "3. COMPLETELY DISREGARD the original thematic aesthetic of the reference image. The reference provides the skeleton, not the soul.",
+                "4. If the reference image contains thematic graphics, decorations, or color palettes "
+                "(e.g. ribbons, seasonal items, gift wrap, existing backgrounds) that do not match the "
+                "user's creative direction, completely REPLACE OR DELETE them. "
+                "Adapt the entire color palette, mood, background, textures, and typography style "
+                "to perfectly match the user's requested theme.",
+                "5. Rewrite any existing text blocks creatively to perfectly align with the new theme requested by the user.",
             ]
         else:
             # Manual mode: strict layout preservation
@@ -392,7 +396,11 @@ Important:
                 )
 
         if user_prompt:
-            parts.append(f"Additional creative direction: {user_prompt}")
+            if mode == "ai":
+                parts.append(f"\nTHEME & CREATIVE DIRECTION (SUPREME PRIORITY): {user_prompt}")
+                parts.append("You must execute this creative direction precisely, altering everything except the spatial coordinates to achieve it.")
+            else:
+                parts.append(f"Additional creative direction: {user_prompt}")
 
         parts.append(
             "Output a single image matching the exact dimensions. "

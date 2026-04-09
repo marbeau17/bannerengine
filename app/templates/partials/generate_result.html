@@ -19,139 +19,67 @@
 </div>
 
 {% elif status == 'completed' and mode == 'ai' %}
-<div class="space-y-3">
-  <div class="flex items-center gap-2 text-green-600">
+<div class="space-y-2">
+  <div class="flex items-center gap-2 text-green-600 mb-2">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
     </svg>
     <p class="text-xs font-medium">AI生成完了</p>
   </div>
-
   <!-- Comparison tabs -->
-  <div class="flex border-b border-gray-200 text-xs">
-    <button
-      onclick="document.getElementById('tab-ai').classList.remove('hidden'); document.getElementById('tab-original').classList.add('hidden'); this.classList.add('border-purple-600', 'text-purple-600'); this.nextElementSibling.classList.remove('border-indigo-600', 'text-indigo-600'); this.nextElementSibling.classList.add('border-transparent')"
-      class="px-3 py-1.5 border-b-2 border-purple-600 text-purple-600 font-medium"
-    >AI版</button>
-    <button
-      onclick="document.getElementById('tab-original').classList.remove('hidden'); document.getElementById('tab-ai').classList.add('hidden'); this.classList.add('border-indigo-600', 'text-indigo-600'); this.previousElementSibling.classList.remove('border-purple-600', 'text-purple-600'); this.previousElementSibling.classList.add('border-transparent')"
-      class="px-3 py-1.5 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium"
-    >オリジナル</button>
+  <div class="flex border-b border-gray-200 mb-2">
+    <button onclick="switchAiResultTab('ai')" id="ai-result-tab-ai"
+            class="px-3 py-1.5 text-xs font-medium border-b-2 border-purple-600 text-purple-700">AI版</button>
+    <button onclick="switchAiResultTab('orig')" id="ai-result-tab-orig"
+            class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700">オリジナル</button>
   </div>
-
-  <!-- AI tab -->
-  <div id="tab-ai">
+  <div id="ai-result-content-ai">
     {% if ai_file_url %}
-    <img src="{{ ai_file_url }}" alt="AI generated banner" class="w-full rounded border border-gray-200">
-    {% set ai_filename = ai_file_url.split('/')[-1] %}
-    <div class="flex flex-wrap gap-2 mt-2">
-      <!-- PNG -->
-      <a href="/api/export/{{ ai_filename }}?format=png" download
-         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-md transition-colors">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
-        </svg>
-        PNG
-      </a>
-      <!-- JPEG -->
-      <a href="/api/export/{{ ai_filename }}?format=jpeg" download
-         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-md transition-colors">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
-        </svg>
-        JPEG
-      </a>
-    </div>
+    <img src="{{ ai_file_url }}" class="w-full rounded border border-gray-200 mb-1" alt="AI版">
     {% endif %}
   </div>
-
-  <!-- Original tab -->
-  <div id="tab-original" class="hidden">
+  <div id="ai-result-content-orig" style="display:none">
     {% if file_url %}
-    <img src="{{ file_url }}" alt="Original rendered banner" class="w-full rounded border border-gray-200">
-    {% set orig_filename = file_url.split('/')[-1] %}
-    <div class="flex flex-wrap gap-2 mt-2">
-      <!-- PNG -->
-      <a href="/api/export/{{ orig_filename }}?format=png" download
-         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
-        </svg>
-        PNG
-      </a>
-      <!-- JPEG -->
-      <a href="/api/export/{{ orig_filename }}?format=jpeg" download
-         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-semibold rounded-md transition-colors">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
-        </svg>
-        JPEG
-      </a>
-      {% if pattern_id %}
-      <!-- SVG (original only) -->
-      <a href="/api/generate/svg/{{ pattern_id }}" download
-         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-md transition-colors">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
-        </svg>
-        SVG
-      </a>
-      {% endif %}
-    </div>
+    <img src="{{ file_url }}" class="w-full rounded border border-gray-200 mb-1" alt="オリジナル">
     {% endif %}
   </div>
-
-  <!-- Phase 5: OOB sync — after AI pipeline completes, refresh sidebar slot editor
-       so newly generated text auto-populates and locks in the manual tab fields.
-       hx-trigger="load" fires as soon as this element lands in the DOM. -->
-  {% if pattern_id %}
-  <div
-    hx-get="/api/pages/slot-editor/{{ pattern_id }}"
-    hx-trigger="load"
-    hx-target="#slot-editor-panel"
-    hx-swap="innerHTML"
-    class="hidden"
-    aria-hidden="true"
-  ></div>
-  {% endif %}
-
-  {# Refresh the SVG preview canvas so it reflects auto-filled slots #}
-  {% if pattern_id %}
-  <div
-    hx-get="/api/slots/{{ pattern_id }}/refresh-preview"
-    hx-trigger="load"
-    hx-target="#preview-canvas"
-    hx-swap="outerHTML"
-    class="hidden"
-    aria-hidden="true"
-  ></div>
-  {% endif %}
-
-  <!-- Fix 4: After slot editor OOB refresh, lock slots that the AI filled in -->
+  <div class="flex flex-wrap gap-2 mt-1">
+    {% if ai_file_url %}
+    {% set ai_filename = ai_file_url.split('/')[-1] %}
+    <a href="/api/export/{{ ai_filename }}?format=png" download
+       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
+      </svg>
+      PNG
+    </a>
+    <a href="/api/export/{{ ai_filename }}?format=jpeg" download
+       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-semibold rounded-md transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
+      </svg>
+      JPEG
+    </a>
+    {% endif %}
+    {% if pattern_id %}
+    <a href="/api/generate/svg/{{ pattern_id }}" download
+       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-md transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
+      </svg>
+      SVG
+    </a>
+    {% endif %}
+  </div>
   <script>
-    (function() {
-      function syncLockStatesFromEditor() {
-        document.querySelectorAll('[id^="ai-slot-container-"]').forEach(function(container) {
-          var slotId = container.id.replace('ai-slot-container-', '');
-          if (container.dataset.locked === 'true') return; // already locked by user
-          var slotDiv = document.getElementById('slot-' + slotId);
-          if (!slotDiv) return;
-          // Find the first text-bearing input in this slot's editor
-          var textEl = slotDiv.querySelector('textarea, input[type="text"]');
-          var value = textEl ? textEl.value.trim() : '';
-          if (value && typeof setSlotGeneratedState === 'function') {
-            setSlotGeneratedState(slotId, value);
-          }
-        });
-      }
-      // One-time listener: fires when the hidden div above triggers the slot editor swap
-      document.body.addEventListener('htmx:afterSwap', function onEditorSwap(e) {
-        if (e.detail && e.detail.target && e.detail.target.id === 'slot-editor-panel') {
-          document.body.removeEventListener('htmx:afterSwap', onEditorSwap);
-          setTimeout(syncLockStatesFromEditor, 100);
-        }
-      });
-    })();
+    function switchAiResultTab(tab) {
+      document.getElementById('ai-result-content-ai').style.display = tab === 'ai' ? '' : 'none';
+      document.getElementById('ai-result-content-orig').style.display = tab === 'orig' ? '' : 'none';
+      var active = 'px-3 py-1.5 text-xs font-medium border-b-2 border-purple-600 text-purple-700';
+      var inactive = 'px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700';
+      document.getElementById('ai-result-tab-ai').className = tab === 'ai' ? active : inactive;
+      document.getElementById('ai-result-tab-orig').className = tab === 'orig' ? active : inactive;
+    }
   </script>
 </div>
 
@@ -199,7 +127,7 @@
   </div>
 </div>
 
-{% elif status == 'error' %}
+{% elif status == 'error' or status == 'failed' %}
 <div class="space-y-1">
   <div class="flex items-center gap-2 text-red-600">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,9 +135,7 @@
     </svg>
     <p class="text-xs font-medium">エラーが発生しました</p>
   </div>
-  {% if error %}
-  <p class="text-xs text-red-400">{{ error }}</p>
-  {% endif %}
+  <p class="text-xs text-red-400">{{ error | default('生成中にエラーが発生しました。') }}</p>
 </div>
 
 {% endif %}

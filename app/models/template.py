@@ -15,6 +15,7 @@ class SlotType(str, Enum):
     IMAGE_OR_TEXT = "image_or_text"
     RECT = "rect"
     CIRCLE = "circle"
+    BACKGROUND = "background"
 
 
 class TemplateMeta(BaseModel):

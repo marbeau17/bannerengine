@@ -108,6 +108,8 @@ async def _render_banner(job_id: str, svg_string: str, width: int, height: int) 
 
         # Embed local images as base64 data URIs so cairosvg can render them
         svg_for_render = await asyncio.to_thread(_embed_local_images, svg_string)
+        # Embed Google Fonts as base64 @font-face so cairosvg can render them
+        svg_for_render = _embed_google_fonts(svg_for_render)
 
         png_bytes = await asyncio.to_thread(_svg_to_png, svg_for_render, width, height)
         job["progress"] = 80
@@ -520,6 +522,7 @@ async def _render_ai_banner(
         # Step 1: Render SVG → PNG
         job["progress"] = 10
         svg_for_render = await asyncio.to_thread(_embed_local_images, svg_string)
+        svg_for_render = _embed_google_fonts(svg_for_render)
         png_bytes = await asyncio.to_thread(_svg_to_png, svg_for_render, width, height)
 
         svg_filename = f"{job_id}_svg.png"
@@ -585,6 +588,91 @@ def _hex_to_rgba(hex_color: str) -> tuple[int, int, int, int]:
     return (255, 255, 255, 255)
 
 
+def _embed_google_fonts(svg_string: str) -> str:
+    """Replace @import Google Fonts URLs with embedded @font-face base64 rules.
+
+    Offline SVG viewers (Illustrator, Inkscape) cannot follow @import url() CSS
+    statements. This function fetches each Google Fonts CSS URL found in <style>
+    blocks, extracts the woff2 src URLs, downloads the font binaries, and replaces
+    the @import with embedded @font-face { src: url(data:font/woff2;base64,...) }.
+
+    Falls back to leaving the @import unchanged if any network or parse error occurs.
+    """
+    _GF_HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+        )
+    }
+
+    import_pattern = re.compile(
+        r"@import\s+url\(['\"]?(https://fonts\.googleapis\.com/css2?[^'\")\s]+)['\"]?\)\s*;",
+        re.IGNORECASE,
+    )
+
+    def _replace_import(match: re.Match) -> str:
+        # ET.tostring may have escaped & → &amp; inside <style>; restore for HTTP fetch
+        gf_url = match.group(1).replace("&amp;", "&")
+        try:
+            import httpx
+
+            # Fetch the Google Fonts CSS (need browser UA to get woff2)
+            css_resp = httpx.get(gf_url, headers=_GF_HEADERS, timeout=10, follow_redirects=True)
+            if css_resp.status_code != 200:
+                logger.warning("embed_google_fonts: CSS fetch failed %s → %s", gf_url, css_resp.status_code)
+                return match.group(0)
+            css_text = css_resp.text
+
+            # Extract all @font-face blocks from the response
+            face_blocks = re.findall(r"@font-face\s*\{([^}]+)\}", css_text, re.DOTALL)
+            if not face_blocks:
+                return match.group(0)
+
+            embedded_faces: list[str] = []
+            for block in face_blocks:
+                # Extract font-family name
+                fam_m = re.search(r"font-family:\s*['\"]?([^;'\"]+)['\"]?", block)
+                # Extract font-weight
+                wgt_m = re.search(r"font-weight:\s*(\d+)", block)
+                # Extract woff2 src URL
+                src_m = re.search(r"url\(([^)]+\.woff2)\)", block)
+
+                if not (fam_m and src_m):
+                    continue
+
+                font_name = fam_m.group(1).strip()
+                font_weight = wgt_m.group(1) if wgt_m else "400"
+                woff2_url = src_m.group(1).strip().strip("'\"")
+
+                try:
+                    font_resp = httpx.get(woff2_url, headers=_GF_HEADERS, timeout=15, follow_redirects=True)
+                    if font_resp.status_code != 200:
+                        continue
+                    b64 = base64.b64encode(font_resp.content).decode()
+                    embedded_faces.append(
+                        f"@font-face {{ "
+                        f"font-family: '{font_name}'; "
+                        f"font-weight: {font_weight}; "
+                        f"font-style: normal; "
+                        f"src: url(data:font/woff2;base64,{b64}) format('woff2'); "
+                        f"}}"
+                    )
+                    logger.info("embed_google_fonts: embedded %s weight=%s", font_name, font_weight)
+                except Exception as font_exc:
+                    logger.warning("embed_google_fonts: font download failed %s: %s", woff2_url, font_exc)
+
+            if not embedded_faces:
+                return match.group(0)
+
+            return "\n".join(embedded_faces)
+
+        except Exception as exc:
+            logger.warning("embed_google_fonts: failed to embed %s: %s", gf_url, exc)
+            return match.group(0)  # Leave @import unchanged on any error
+
+    return import_pattern.sub(_replace_import, svg_string)
+
+
 @router.get("/svg/{pattern_id}")
 async def export_svg(request: Request, pattern_id: str):
     """Export the current banner as an SVG file with editable text."""
@@ -619,6 +707,10 @@ async def export_svg(request: Request, pattern_id: str):
         r'\1 href="\2" xlink:href="\2"',
         svg_string,
     )
+
+    # Embed Google Fonts as base64 @font-face rules for offline SVG viewers
+    # (Adobe Illustrator, Inkscape, etc. ignore @import url() CSS statements)
+    svg_string = _embed_google_fonts(svg_string)
 
     return Response(
         content=svg_string.encode("utf-8"),

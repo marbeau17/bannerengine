@@ -729,8 +729,8 @@ var CanvasDrag = (function () {
     // Compute new percentage position (clamped to canvas bounds)
     var dxPct = (dx / state.svgRect.width) * 100;
     var dyPct = (dy / state.svgRect.height) * 100;
-    var newX = Math.max(0, state.originXPct + dxPct).toFixed(2);
-    var newY = Math.max(0, state.originYPct + dyPct).toFixed(2);
+    var newX = (state.originXPct + dxPct).toFixed(2);
+    var newY = (state.originYPct + dyPct).toFixed(2);
 
     // PATCH position and refresh canvas with clean re-render
     var formData = new FormData();
@@ -936,6 +936,7 @@ var CanvasSelect = (function () {
 
   var _sel    = null; // current selection state
   var _resize = null; // active resize drag state
+  var _rotDrag = null; // active rotation drag state
 
   /* ── public ── */
 
@@ -1024,6 +1025,60 @@ var CanvasSelect = (function () {
         _handlePos(dir),
       ].join(";");
       div.appendChild(h);
+    });
+
+    // ── Rotation grab-handle (circle 30px above top-centre) ──────────────────
+    var rotLine = document.createElement("div");
+    rotLine.style.cssText = [
+      "position:absolute",
+      "left:calc(50% - 1px)",
+      "top:-30px",
+      "width:2px",
+      "height:30px",
+      "background:#6366f1",
+      "pointer-events:none",
+    ].join(";");
+    div.appendChild(rotLine);
+
+    var rotHandle = document.createElement("div");
+    rotHandle.className = "rot-handle";
+    rotHandle.title = "ドラッグして回転";
+    rotHandle.style.cssText = [
+      "position:absolute",
+      "width:12px",
+      "height:12px",
+      "border-radius:50%",
+      "background:#fff",
+      "border:2px solid #6366f1",
+      "pointer-events:all",
+      "cursor:crosshair",
+      "z-index:10002",
+      "left:calc(50% - 6px)",
+      "top:-42px",
+    ].join(";");
+    div.appendChild(rotHandle);
+
+    rotHandle.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!_sel) return;
+      var svgRect = _sel.svg.getBoundingClientRect();
+      var viewBox = _sel.svg.viewBox.baseVal;
+      // Screen-space centre of the slot (for atan2)
+      var cxScreen = svgRect.left + (_sel.xPct + _sel.wPct / 2) / 100 * svgRect.width;
+      var cyScreen = svgRect.top  + (_sel.yPct + _sel.hPct / 2) / 100 * svgRect.height;
+      // SVG-space centre (for transform string)
+      var cxSvg = (_sel.xPct + _sel.wPct / 2) / 100 * viewBox.width;
+      var cySvg = (_sel.yPct + _sel.hPct / 2) / 100 * viewBox.height;
+      _rotDrag = {
+        slotId: _sel.slotId,
+        patternId: _sel.patternId,
+        cxScreen: cxScreen, cyScreen: cyScreen,
+        cxSvg: cxSvg, cySvg: cySvg,
+        currentAngle: 0,
+      };
+      document.addEventListener("mousemove", _onRotMove);
+      document.addEventListener("mouseup",   _onRotUp);
     });
 
     return div;
@@ -1129,6 +1184,63 @@ var CanvasSelect = (function () {
     if (ov && ov.contains(e.target)) return;
     if (e.target.closest && e.target.closest("g.draggable-slot")) return;
     deselect();
+  }
+
+  // ── Rotation drag handlers ────────────────────────────────────────────────
+
+  function _onRotMove(e) {
+    if (!_rotDrag) return;
+    var dx = e.clientX - _rotDrag.cxScreen;
+    var dy = e.clientY - _rotDrag.cyScreen;
+    // atan2: 0° = right; +90° shift makes 0° = up (natural rotation origin)
+    var angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+    if (angle > 180)  angle -= 360;
+    if (angle < -180) angle += 360;
+    _rotDrag.currentAngle = Math.round(angle);
+    // Live visual preview via SVG transform
+    if (_sel && _sel.group) {
+      _sel.group.setAttribute(
+        "transform",
+        "rotate(" + _rotDrag.currentAngle + " " + _rotDrag.cxSvg.toFixed(1) + " " + _rotDrag.cySvg.toFixed(1) + ")"
+      );
+    }
+    // Sync the rotation slider in the sidebar (if visible)
+    var rotSlider = document.querySelector('input[name="rotation"]');
+    if (rotSlider) {
+      rotSlider.value = _rotDrag.currentAngle;
+      if (rotSlider.nextElementSibling) {
+        rotSlider.nextElementSibling.textContent = _rotDrag.currentAngle + "°";
+      }
+    }
+  }
+
+  function _onRotUp(e) {
+    document.removeEventListener("mousemove", _onRotMove);
+    document.removeEventListener("mouseup",   _onRotUp);
+    if (!_rotDrag) return;
+    var r = _rotDrag;
+    _rotDrag = null;
+
+    // Only custom layers route to /api/layers/; template slots use /api/slots/
+    // Rotation is a text-style property — skip non-text custom layers
+    var isCustom = r.slotId.startsWith("ai_extra_") || r.slotId.startsWith("custom_");
+    if (isCustom) {
+      // Custom layers: persist via /api/layers/ PATCH with rotation key
+      var fd = new FormData();
+      fd.append("rotation", r.currentAngle);
+      fetch("/api/layers/" + r.patternId + "/" + r.slotId, { method: "PATCH", body: fd })
+        .then(function (res) { return res.ok ? res.text() : Promise.reject("HTTP " + res.status); })
+        .then(function (html) { applyCanvasResponse(html); deselect(); })
+        .catch(function (err) { console.error("CanvasSelect: rotation save failed:", err); deselect(); });
+    } else {
+      // Template text slot — use htmx.ajax with slot_type=text
+      htmx.ajax("PATCH", "/api/slots/" + r.patternId + "/" + r.slotId, {
+        values: { slot_type: "text", rotation: r.currentAngle },
+        target: "#preview-canvas",
+        swap: "outerHTML",
+      });
+      deselect();
+    }
   }
 
   return { init: init, selectGroup: selectGroup, deselect: deselect };

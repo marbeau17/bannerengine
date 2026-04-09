@@ -104,7 +104,9 @@ async def reset_slots(request: Request, pattern_id: str):
     """
     request.session.pop(f"slots_{pattern_id}", None)
     request.session.pop(f"custom_ref_{pattern_id}", None)
-    return Response(status_code=204, headers={"HX-Refresh": "true"})
+    request.session.pop(f"ai_job_{pattern_id}", None)
+    request.session.pop(f"slots_{pattern_id}_pre_reconstruct", None)
+    return Response(content="", status_code=200, headers={"HX-Refresh": "true"})
 
 
 @router.delete("/{pattern_id}/{slot_id}", response_class=HTMLResponse)
@@ -228,12 +230,72 @@ async def update_slot(request: Request, pattern_id: str, slot_id: str):
     _MERGE_FIELDS = {
         "button": ("bg_color", "text_color", "font_size"),
         "image": ("prompt", "fit"),
-        "text": ("font_size", "font_weight", "color"),
+        "text": ("font_size", "font_weight", "color", "font_family"),
+        "background": ("fill_color", "source_url"),
     }
     for field in _MERGE_FIELDS.get(slot_type, ()):
         form_val = form_data.get(field)
         if form_val is not None:
             existing[field] = str(form_val)
+
+    # Vertical text toggle — sent explicitly as "true"/"false" via htmx.ajax
+    if slot_type == "text":
+        vertical_val = form_data.get("vertical")
+        if vertical_val is not None:
+            existing["vertical"] = str(vertical_val).lower() in ("true", "on", "1", "yes")
+
+    # Rotation — stored as float degrees (range slider sends 0-based integer string)
+    if slot_type == "text":
+        rotation_val = form_data.get("rotation")
+        if rotation_val is not None and str(rotation_val).strip():
+            try:
+                existing["rotation"] = max(-180.0, min(180.0, float(rotation_val)))
+            except (ValueError, TypeError):
+                pass
+
+    # Merge text SVG effect fields into nested text_style dict
+    if slot_type == "text":
+        _EFFECT_FIELDS = (
+            "effect_type", "effect_color",
+            "shadow_dx", "shadow_dy", "shadow_blur", "shadow_opacity",
+            "stroke_width",
+        )
+        if any(form_data.get(f) is not None for f in _EFFECT_FIELDS):
+            ts = existing.get("text_style", {})
+            if not isinstance(ts, dict):
+                ts = {}
+
+            effect_type = form_data.get("effect_type")
+            if effect_type is not None:
+                if effect_type == "":
+                    # Clearing the effect removes all effect sub-fields too
+                    ts.clear()
+                else:
+                    ts["effect_type"] = str(effect_type)
+
+            # String / hex fields
+            for field in ("effect_color", "shadow_color"):
+                val = form_data.get(field)
+                if val is not None:
+                    ts[field] = str(val)
+
+            # Numeric fields — stored as floats; shadow_opacity is 0-100 from slider → 0.0-1.0
+            _NUMERIC = {
+                "shadow_dx":      (float, None),
+                "shadow_dy":      (float, None),
+                "shadow_blur":    (float, None),
+                "shadow_opacity": (lambda v: round(float(v) / 100.0, 3), None),
+                "stroke_width":   (float, None),
+            }
+            for field, (converter, _) in _NUMERIC.items():
+                val = form_data.get(field)
+                if val is not None and str(val).strip():
+                    try:
+                        ts[field] = converter(val)
+                    except (ValueError, TypeError):
+                        pass
+
+            existing["text_style"] = ts
 
     # Merge opacity (slider sends 0-100, store as 0.0-1.0 float)
     opacity_val = form_data.get("opacity")
